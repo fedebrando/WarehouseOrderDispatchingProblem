@@ -1,8 +1,10 @@
+
 import pygame
 import time
 import threading
 import numpy as np
 import math
+from orders_monitor import OrdersMonitor
 
 class Warehouse:
     '''
@@ -23,6 +25,7 @@ class Warehouse:
         self._Z = np.array(Z, dtype=int)  # Zone coordinates
         self._C = np.array(C, dtype=float)  # AGV coordinates
         self._V = np.array(V, dtype=float)  # AGV speeds
+        self._O_monitor = OrdersMonitor()
         self._O = [[] for _ in self._C]  # Orders for each AGV
         self._running = True
 
@@ -35,15 +38,19 @@ class Warehouse:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self._running = False
+            self._O_monitor.agv_start()
             self._update()
             self._draw()
+            self._O_monitor.agv_end()
             clock.tick(30)  # 30 FPS
 
     def assign_job(self, c, o):
         '''
         Assigns a job to an AGV with specified values
         '''
+        self._O_monitor.manager_start()
         self._O[c] += o
+        self._O_monitor.manager_end()
     
     def _init_graphics(self):
         pygame.init()
@@ -52,7 +59,9 @@ class Warehouse:
         self._font = pygame.font.Font(None, 24)
     
     def _update(self):
+
         for idx, c in enumerate(self._C):
+            # start
             if self._O[idx]:
                 dest = self._Z[self._O[idx][0]]
                 direction = dest - c
@@ -64,6 +73,8 @@ class Warehouse:
                 else:
                     self._C[idx] = dest
                     self._O[idx].pop(0)
+            # end
+        
     
     def _draw_grid(self):
         # Draw the grid
@@ -132,13 +143,10 @@ class Warehouse:
 # AGV manager assigning jobs at different times
 def AGV_manager(warehouse):
     O = [[0, 1], [3, 5], [4, 2], [2, 5], [0, 5]]
-    time.sleep(2)
+    time.sleep(5)
     warehouse.assign_job(0, O[0])
-    time.sleep(4)
     warehouse.assign_job(1, O[1])
-    time.sleep(2)
     warehouse.assign_job(2, O[2])
-    time.sleep(1)
     warehouse.assign_job(1, O[3])
     warehouse.assign_job(0, O[4])
 
