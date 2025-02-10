@@ -1,120 +1,161 @@
-
-'''
-Warehouse simulator
-'''
-
+import pygame
+import time
+import threading
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
+import math
 
 class Warehouse:
     '''
-    Warehouse simulation
+    Warehouse Simulator
     '''
-    def __init__(self, W: float, H: float, Z: list[list[float]], C: list[list[float]], V: list[float]):
+    _GRID_COLOR = (50, 50, 50)
+    _WIDTH, _HEIGHT = 500, 500
+    _BG_COLOR = (30, 30, 30)
+    _ZONE_COLOR = (100, 100, 100)
+    _TEXT_COLOR = (30, 30, 30)
+    _AGV_COLOR_IDLE = (0, 255, 0)
+    _AGV_COLOR_BUSY = (255, 0, 0)
+
+    def __init__(self, W, H, Z, C, V):
+        self._init_graphics()
         self._W = W
         self._H = H
-        self._Z = np.array(Z, dtype=np.dtype('float32'))
-        self._C = np.array(C, dtype=np.dtype('float32'))
-        self._V = np.array(V, dtype=np.dtype('float32'))
-        self._C_last_dir = np.array([[0, 0] for _ in self._C], dtype=np.dtype('float32'))
-        self._O = [[] for _ in self._C]
-
-        # Create the figure and axis
-        self._fig, self._ax = plt.subplots(figsize=(8, 8))
-        self._ax.set_xlim(0, W)
-        self._ax.set_ylim(0, H)
-        self._ax.set_aspect('equal', adjustable='box')  # Keep equal scaling for x and y axes
+        self._Z = np.array(Z, dtype=int)  # Zone coordinates
+        self._C = np.array(C, dtype=float)  # AGV coordinates
+        self._V = np.array(V, dtype=float)  # AGV speeds
+        self._O = [[] for _ in self._C]  # Orders for each AGV
+        self._running = True
 
     def start(self):
         '''
-        Start simulation
+        Starts the simulation
         '''
-        self._anim = animation.FuncAnimation(self._fig, self._update, frames=100, interval=50)
-        plt.show()
+        clock = pygame.time.Clock()
+        while self._running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self._running = False
+            self._update()
+            self._draw()
+            clock.tick(30)  # 30 FPS
 
-    def assign_job(self, c: int, o: list[int]):
+    def assign_job(self, c, o):
         '''
-        Assign a job to a specified AGV
+        Assigns a job to an AGV with specified values
         '''
         self._O[c] += o
-
-    # Update function for animation
-    def _update(self, frame):
-        self._ax.clear()
-        self._ax.set_title("Warehouse Simulator")
-
-        # Zones (draw first so AGVs appear on top)
-        for idx, z in enumerate(self._Z):
-            self._ax.scatter(z[0], z[1], color='gray', marker='s', s=400, zorder=1)
-            self._ax.text(z[0], z[1], f'Z{idx}', color='white', fontsize=10, ha='center', va='center', zorder=2)
-
-        # AGVs (draw after zones so they appear on top)
+    
+    def _init_graphics(self):
+        pygame.init()
+        self._screen = pygame.display.set_mode((self._WIDTH, self._HEIGHT))  # Define the window here
+        pygame.display.set_caption("Warehouse Simulator")
+        self._font = pygame.font.Font(None, 24)
+    
+    def _update(self):
         for idx, c in enumerate(self._C):
-            if len(self._O[idx]):
+            if self._O[idx]:
                 dest = self._Z[self._O[idx][0]]
-                direction = dest - self._C[idx]
-                direction_normalized = (direction / np.linalg.norm(direction)) if direction.any() else np.array([0, 0])
-                self._C[idx] += direction_normalized * self._V[idx]
-                if np.isin(-1, (np.sign(self._C_last_dir[idx]) * np.sign(direction_normalized))) or (self._C[idx] == dest).all():
+                direction = dest - c
+                distance = np.linalg.norm(direction)
+                
+                if distance > self._V[idx]:
+                    shift = (direction / distance) * self._V[idx]
+                    self._C[idx] += shift
+                else:
                     self._C[idx] = dest
-                    direction_normalized = np.array([0, 0])
                     self._O[idx].pop(0)
-                self._C_last_dir[idx] = direction_normalized
-
-                # Plot arrow
-                if (self._C[idx] != dest).any():
-                    self._ax.arrow(
-                        c[0], c[1], direction_normalized[0] * 5 * self._V[idx],
-                        direction_normalized[1] * 5 * self._V[idx],
-                        head_width=5,
-                        head_length=7,
-                        fc=('green' if len(self._O[idx]) == 0 else 'red'),
-                        ec=('green' if len(self._O[idx]) == 0 else 'red'),
-                        zorder=3
-                    )
-
-            # Plot AGV with label
-            self._ax.scatter(c[0], c[1], color=('green' if len(self._O[idx]) == 0 else 'red'), marker='o', s=200, zorder=4)
-            self._ax.text(c[0], c[1], f'C{idx}', color='white', fontsize=8, ha='center', va='center', zorder=5)
+    
+    def _draw_grid(self):
+        # Draw the grid
+        grid_size = 50
+        for x in range(0, self._W, grid_size):
+            pygame.draw.line(self._screen, self._GRID_COLOR, (x, 0), (x, self._H))
+        for y in range(0, self._H, grid_size):
+            pygame.draw.line(self._screen, self._GRID_COLOR, (0, y), (self._W, y))
+    
+    def _draw(self):
+        self._screen.fill(self._BG_COLOR)
         
-        # Axes style
-        self._ax.set_xticks(range(0, self._W + 1, self._W // 10))
-        self._ax.set_yticks(range(0, self._H + 1, self._H // 10))
-        self._ax.xaxis.set_tick_params(width=0)
-        self._ax.yaxis.set_tick_params(width=0)
-        self._ax.grid(True, which='both', linestyle='--', linewidth=0.5, color='gray')
+        # Draw the grid
+        self._draw_grid()
+        
+        # Draw zones with labels
+        for idx, z in enumerate(self._Z):
+            pygame.draw.rect(self._screen, self._ZONE_COLOR, (int(z[0]) - 10, int(z[1]) - 10, 20, 20))
+            
+            # Create the label for the zone
+            label = self._font.render(f"Z{idx}", True, self._TEXT_COLOR)
 
-import time
-import threading
+            # Calculate the position of the text centered above the zone
+            label_width = label.get_width()
+            label_height = label.get_height()
+            x_pos = int(z[0] - label_width / 2)
+            y_pos = int(z[1] - label_height / 2) - 15  # Move slightly above the zone
 
-W, H = 500, 500
-Z = [[100, 100], [250, 100], [400, 100], [100, 400], [250, 400], [400, 400]]
-C = [[150, 250], [250, 250], [350, 250]]
-V = [6] * 3
-w = Warehouse(W, H, Z, C, V)
+            self._screen.blit(label, (x_pos, y_pos))
+        
+        # Draw AGVs and direction arrows
+        for idx, c in enumerate(self._C):
+            color = self._AGV_COLOR_BUSY if self._O[idx] else self._AGV_COLOR_IDLE
 
-def warehouse_simulation():
-    w.start()
+            # Draw the arrow before the AGVs
+            if self._O[idx]:
+                destination = self._Z[self._O[idx][0]]
+                angle = math.atan2(destination[1] - c[1], destination[0] - c[0])
 
-def AGV_manager():
+                # Create the arrow
+                arrow_length = 20
+                arrow_width = 5
+                arrow_points = [
+                    (c[0] + math.cos(angle) * arrow_length, c[1] + math.sin(angle) * arrow_length),
+                    (c[0] + math.cos(angle + math.pi / 6) * arrow_width, c[1] + math.sin(angle + math.pi / 6) * arrow_width),
+                    (c[0] + math.cos(angle - math.pi / 6) * arrow_width, c[1] + math.sin(angle - math.pi / 6) * arrow_width),
+                ]
+                pygame.draw.polygon(self._screen, color, arrow_points)  # Use the same color as the AGV
+
+            # Then draw the AGV over the arrow
+            pygame.draw.circle(self._screen, color, (int(c[0]), int(c[1])), 10)
+            
+            # Calculate the AGV number to display in the center
+            label = self._font.render(f"{idx}", True, self._TEXT_COLOR)
+
+            # Calculate the position of the text centered inside the AGV
+            label_width = label.get_width()
+            label_height = label.get_height()
+            x_pos = int(c[0] - label_width / 2)
+            y_pos = int(c[1] - label_height / 2)
+
+            self._screen.blit(label, (x_pos, y_pos))
+
+        pygame.display.flip()
+
+# AGV manager assigning jobs at different times
+def AGV_manager(warehouse):
     O = [[0, 1], [3, 5], [4, 2], [2, 5], [0, 5]]
     time.sleep(2)
-    w.assign_job(0, O[0])
+    warehouse.assign_job(0, O[0])
     time.sleep(4)
-    w.assign_job(1, O[1])
+    warehouse.assign_job(1, O[1])
     time.sleep(2)
-    w.assign_job(2, O[2])
+    warehouse.assign_job(2, O[2])
     time.sleep(1)
-    w.assign_job(1, O[3])
-    time.sleep(0)
-    w.assign_job(0, O[4])
+    warehouse.assign_job(1, O[3])
+    warehouse.assign_job(0, O[4])
 
+# Main function initializing the warehouse and starting the simulation
 def main():
-    sim_thread = threading.Thread(target=AGV_manager, daemon=True)
-    sim_thread.start()
-    warehouse_simulation()
+    W, H = 500, 500  # Set the window size as the warehouse size
+    Z = [[100, 100], [250, 100], [400, 100], [100, 400], [250, 400], [400, 400]]
+    C = [[150, 250], [250, 250], [350, 250]]
+    V = [1, 1, 1]  # AGV speeds
+    warehouse = Warehouse(W, H, Z, C, V)
     
+    agv_thread = threading.Thread(target=AGV_manager, args=(warehouse,), daemon=True)
+    agv_thread.start()
+    
+    warehouse.start()
+    pygame.quit()
 
-if __name__ == '__main__': # Entry point
+
+if __name__ == "__main__": # Entry point
     main()
