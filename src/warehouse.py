@@ -3,6 +3,7 @@ import pygame
 import numpy as np
 import math
 from orders_monitor import OrdersMonitor
+from dynamic_order import DynamicOrder
 
 class Warehouse:
     '''
@@ -16,11 +17,11 @@ class Warehouse:
     _AGV_COLOR_IDLE = (0, 255, 0)
     _AGV_COLOR_BUSY = (255, 0, 0)
 
-    def __init__(self, W, H, Z, C, V):
+    def __init__(self, W: int, H: int, Z: list[list[float]], C: list[list[float]], V: list[float]):
         self._init_graphics()
         self._W = W
         self._H = H
-        self._Z = np.array(Z, dtype=int)  # Zone coordinates
+        self._Z = np.array(Z, dtype=float)  # Zone coordinates
         self._C = np.array(C, dtype=float)  # AGV coordinates
         self._V = np.array(V, dtype=float)  # AGV speeds
         self._O_monitor = OrdersMonitor()
@@ -42,12 +43,12 @@ class Warehouse:
             self._O_monitor.agv_end()
             clock.tick(30)  # 30 FPS
 
-    def assign_job(self, c, o):
+    def assign_job(self, c: int, o: DynamicOrder):
         '''
         Assigns a job to an AGV with specified values
         '''
         self._O_monitor.manager_start()
-        self._O[c] += o
+        self._O[c] += [o.get_pick(), o.get_drop()]
         self._O_monitor.manager_end()
     
     def _init_graphics(self):
