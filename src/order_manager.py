@@ -29,10 +29,9 @@ class OrderManager:
         return 0
     
     def _order_managing(self):
-        curr_t = 0
+        t0 = time.time()
         for i, order in enumerate(self._orders):
-            time.sleep(order.get_t_arr() - curr_t)
-            curr_t = order.get_t_arr()
+            time.sleep(max(t0 + order.get_t_arr() - time.time(), 0))
             self._warehouse.assign_job(i % 3, order)
 
     def _read_orders(self) -> list[DynamicOrder]:

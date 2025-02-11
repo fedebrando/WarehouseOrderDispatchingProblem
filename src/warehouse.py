@@ -24,8 +24,7 @@ class Warehouse:
         self._Z = np.array(Z, dtype=float)  # Zone coordinates
         self._C = np.array(C, dtype=float)  # AGV coordinates
         self._V = np.array(V, dtype=float)  # AGV speeds
-        self._O_monitor = OrdersMonitor()
-        self._O = [[] for _ in self._C]  # Orders for each AGV
+        self._O_monitor = OrdersMonitor(len(self._C))
         self._running = True
 
     def start(self):
@@ -37,7 +36,7 @@ class Warehouse:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self._running = False
-            self._O_monitor.agv_start()
+            self._O = self._O_monitor.agv_start()
             self._update()
             self._draw()
             self._O_monitor.agv_end()
@@ -47,9 +46,7 @@ class Warehouse:
         '''
         Assigns a job to an AGV with specified values
         '''
-        self._O_monitor.manager_start()
-        self._O[c] += [o.get_pick(), o.get_drop()]
-        self._O_monitor.manager_end()
+        self._O_monitor.manager_assign_job(c, o)
     
     def _init_graphics(self):
         pygame.init()
