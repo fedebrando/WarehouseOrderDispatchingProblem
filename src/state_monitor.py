@@ -1,23 +1,27 @@
 
 import threading
+import numpy as np
 from dynamic_order import DynamicOrder
 
-class OrdersMonitor:
+class StateMonitor:
     '''
     Monitor for concurrent order access
     '''
-    def __init__(self, num_agv: int):
-        self._O = [[] for _ in range(num_agv)]  # Orders for each AGV
+    def __init__(self, Z: list[list[float]], C: list[list[float]], V: list[float]):
+        self._O = [[] for _ in range(len(C))]  # Orders for each AGV
+        self._Z = np.array(Z, dtype=float)  # Zone coordinates
+        self._C = np.array(C, dtype=float)  # AGV coordinates
+        self._V = np.array(V, dtype=float)  # AGV speeds
         self._cond = threading.Condition()
         self._agv_control = False
 
-    def agv_start(self):
+    def agv_start(self) -> tuple[np.array, np.array, np.array, list[list[int]]]:
         '''
-        AGVs require orders control
+        AGVs require orders control: returns Z, C, V and O
         '''
         with self._cond:
             self._agv_control = True
-            return self._O
+            return self._Z, self._C, self._V, self._O
 
     def agv_end(self):
         '''

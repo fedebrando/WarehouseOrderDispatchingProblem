@@ -2,7 +2,7 @@
 import pygame
 import numpy as np
 import math
-from orders_monitor import OrdersMonitor
+from state_monitor import StateMonitor
 from dynamic_order import DynamicOrder
 
 class Warehouse:
@@ -21,10 +21,7 @@ class Warehouse:
         self._init_graphics()
         self._W = W
         self._H = H
-        self._Z = np.array(Z, dtype=float)  # Zone coordinates
-        self._C = np.array(C, dtype=float)  # AGV coordinates
-        self._V = np.array(V, dtype=float)  # AGV speeds
-        self._O_monitor = OrdersMonitor(len(self._C))
+        self._state_monitor = StateMonitor(Z, C, V)
         self._running = True
 
     def start(self):
@@ -36,17 +33,17 @@ class Warehouse:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self._running = False
-            self._O = self._O_monitor.agv_start()
+            self._Z, self._C, self._V, self._O = self._state_monitor.agv_start()
             self._update()
             self._draw()
-            self._O_monitor.agv_end()
+            self._state_monitor.agv_end()
             clock.tick(30)  # 30 FPS
 
     def assign_job(self, c: int, o: DynamicOrder):
         '''
         Assigns a job to an AGV with specified values
         '''
-        self._O_monitor.manager_assign_job(c, o)
+        self._state_monitor.manager_assign_job(c, o)
     
     def _init_graphics(self):
         pygame.init()
