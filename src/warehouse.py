@@ -4,6 +4,7 @@ import numpy as np
 import math
 from state_monitor import StateMonitor
 from dynamic_order import DynamicOrder
+from typing import Callable
 
 class Warehouse:
     '''
@@ -39,11 +40,11 @@ class Warehouse:
             self._state_monitor.agv_end()
             clock.tick(30)  # 30 FPS
 
-    def assign_job(self, c: int, o: DynamicOrder):
+    def assign_job(self, policy: Callable[[DynamicOrder, np.array, np.array, np.array, list[list[int]]], int], o: DynamicOrder):
         '''
         Assigns a job to an AGV with specified values
         '''
-        self._state_monitor.manager_assign_job(c, o)
+        self._state_monitor.manager_assign_job(policy, o)
     
     def _init_graphics(self):
         pygame.init()
@@ -63,6 +64,7 @@ class Warehouse:
                     self._C[idx] += shift
                 else:
                     self._C[idx] = dest
+                    print(self._O)
                     self._O[idx].pop(0)
             
     def _draw_grid(self):

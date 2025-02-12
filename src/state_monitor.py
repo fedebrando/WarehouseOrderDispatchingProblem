@@ -2,6 +2,7 @@
 import threading
 import numpy as np
 from dynamic_order import DynamicOrder
+from typing import Callable
 
 class StateMonitor:
     '''
@@ -29,16 +30,15 @@ class StateMonitor:
         '''
         with self._cond:
             self._agv_control = False
-            self._cond.notify()
+            if any(not bool(orders) for orders in self._O):
+                self._cond.notify()
 
-    def manager_assign_job(self, c: int, o: DynamicOrder):
+    def manager_assign_job(self, policy: Callable[[DynamicOrder, np.array, np.array, np.array, list[list[int]]], int], o: DynamicOrder):
         '''
         Manager requires order control
         '''
         with self._cond:
-            while self._agv_control:
+            while self._agv_control or all(bool(orders) for orders in self._O):
                 self._cond.wait()
 
-            self._O[c] += [o.get_pick(), o.get_drop()]
-
-        
+            self._O[policy(o, self._Z, self._C, self._V, self._O)] += [o.get_pick(), o.get_drop()]
