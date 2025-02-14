@@ -4,6 +4,7 @@ import numpy as np
 import math
 from state_monitor import StateMonitor
 from dynamic_order import DynamicOrder
+from stats import Stats
 from typing import Callable
 
 class Warehouse:
@@ -24,6 +25,7 @@ class Warehouse:
         self._H = H
         self._state_monitor = StateMonitor(Z, C, V)
         self._running = True
+        self._stats = Stats()
 
     def start(self):
         '''
@@ -34,7 +36,7 @@ class Warehouse:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self._running = False
-            self._Z, self._C, self._V, self._O = self._state_monitor.agv_start()
+            self._Z, self._C, self._V, self._O, self._O_ids = self._state_monitor.agv_start()
             self._update()
             self._draw()
             self._state_monitor.agv_end()
@@ -44,6 +46,7 @@ class Warehouse:
         '''
         Assigns a job to an AGV with specified values
         '''
+        self._stats.order_arrival(o.get_id())
         self._state_monitor.manager_assign_job(policy, o)
     
     def _init_graphics(self):
@@ -66,6 +69,10 @@ class Warehouse:
                     self._C[idx] = dest
                     print(self._O)
                     self._O[idx].pop(0)
+                    if len(self._O[idx]) % 2 == 0: # the order is executed (drop zone has been just removed)
+                        self._stats.order_executed(self._O_ids[idx][0])
+                        self._O_ids[idx].pop(0)
+                        print(self._stats.mean_waiting_time())
             
     def _draw_grid(self):
         # Draw the grid

@@ -10,19 +10,20 @@ class StateMonitor:
     '''
     def __init__(self, Z: list[list[float]], C: list[list[float]], V: list[float]):
         self._O = [[] for _ in range(len(C))]  # Orders for each AGV
+        self._O_ids = [[] for _ in range(len(C))]  # Order ids managed by AGVs
         self._Z = np.array(Z, dtype=float)  # Zone coordinates
         self._C = np.array(C, dtype=float)  # AGV coordinates
         self._V = np.array(V, dtype=float)  # AGV speeds
         self._cond = threading.Condition()
         self._agv_control = False
 
-    def agv_start(self) -> tuple[np.array, np.array, np.array, list[list[int]]]:
+    def agv_start(self) -> tuple[np.array, np.array, np.array, list[list[int]], list[list[int]]]:
         '''
-        AGVs require orders control: returns Z, C, V and O
+        AGVs require orders control: returns Z, C, V, O and O_ids
         '''
         with self._cond:
             self._agv_control = True
-            return self._Z, self._C, self._V, self._O
+            return self._Z, self._C, self._V, self._O, self._O_ids
 
     def agv_end(self):
         '''
@@ -41,4 +42,6 @@ class StateMonitor:
             while self._agv_control or all(bool(orders) for orders in self._O):
                 self._cond.wait()
 
-            self._O[policy(o, self._Z, self._C, self._V, self._O)] += [o.get_pick(), o.get_drop()]
+            agv_idx = policy(o, self._Z, self._C, self._V, self._O)
+            self._O[agv_idx] += [o.get_pick(), o.get_drop()]
+            self._O_ids[agv_idx].append(o.get_id())

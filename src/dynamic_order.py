@@ -12,6 +12,12 @@ class DynamicOrder:
         self._pick = pick
         self._drop = drop
 
+    def get_id(self) -> int:
+        '''
+        Returns order ID
+        '''
+        return self._id
+
     def get_t_arr(self) -> float:
         '''
         Returns the arrival time

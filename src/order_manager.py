@@ -28,9 +28,8 @@ class OrderManager:
     def _order_managing(self):
         t0 = time.time()
         for i, order in enumerate(self._orders):
-            time.sleep(s:=max(t0 + order.get_t_arr() - time.time(), 0))
+            time.sleep(max(t0 + order.get_t_arr() - time.time(), 0))
             self._warehouse.assign_job(self._policy, order)
-            print(s)
 
     def _read_orders(self) -> list[DynamicOrder]:
         '''Reads the orders from a CSV file and returns a list of DynamicOrder objects.'''
