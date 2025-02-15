@@ -8,8 +8,9 @@ def main():
     Z = [[100, 100], [250, 100], [400, 100], [100, 400], [250, 400], [400, 400]]
     C = [[150, 250], [250, 250], [350, 250]]
     V = [5, 5, 3]
+    P = 500
 
-    warehouse = Warehouse(W, H, Z, C, V)
+    warehouse = Warehouse(W, H, Z, C, V, P)
     manager = OrderManager(warehouse, SPTF)
     manager.start()
 

@@ -19,11 +19,11 @@ class Warehouse:
     _AGV_COLOR_IDLE = (0, 255, 0)
     _AGV_COLOR_BUSY = (255, 0, 0)
 
-    def __init__(self, W: int, H: int, Z: list[list[float]], C: list[list[float]], V: list[float]):
+    def __init__(self, W: int, H: int, Z: list[list[float]], C: list[list[float]], V: list[float], P: float):
         self._init_graphics()
         self._W = W
         self._H = H
-        self._state_monitor = StateMonitor(Z, C, V)
+        self._state_monitor = StateMonitor(Z, C, V, P)
         self._running = True
         self._stats = Stats()
 
@@ -47,7 +47,7 @@ class Warehouse:
         Assigns a job to an AGV with specified values
         '''
         self._stats.order_arrival(o.get_id())
-        self._state_monitor.manager_assign_job(policy, o)
+        self._state_monitor.manager_assign_job(policy, o, self._stats)
     
     def _init_graphics(self):
         pygame.init()
@@ -67,12 +67,13 @@ class Warehouse:
                     self._C[idx] += shift
                 else:
                     self._C[idx] = dest
-                    print(self._O)
                     self._O[idx].pop(0)
                     if len(self._O[idx]) % 2 == 0: # the order is executed (drop zone has been just removed)
                         self._stats.order_executed(self._O_ids[idx][0])
                         self._O_ids[idx].pop(0)
-                        print(self._stats.mean_waiting_time())
+                        print('Mean waiting time:', self._stats.mean_waiting_time(), 's')
+                        print('Mean distance', self._stats.mean_distance(), 'm')
+                        print('Mean consumption:', self._stats.mean_consumption(), 'J')
             
     def _draw_grid(self):
         # Draw the grid
