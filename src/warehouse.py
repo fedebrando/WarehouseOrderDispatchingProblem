@@ -14,7 +14,8 @@ class Warehouse:
     _WIDTH_TERMINAL = 350
     _BG_COLOR = (30, 30, 30)
     _ZONE_COLOR = (100, 100, 100)
-    _TEXT_COLOR = (30, 30, 30)
+    _ZONE_TEXT_COLOR = (175, 175, 175)
+    _AGV_TEXT_COLOR = (30, 30, 30)
     _AGV_COLOR_IDLE = (0, 255, 0)
     _AGV_COLOR_BUSY = (255, 0, 0)
 
@@ -61,7 +62,7 @@ class Warehouse:
         
         for idx, c in enumerate(self._C):
             assigned_order = self._O_ids[idx][0] if self._O_ids[idx] else '-'
-            path = " -> ".join(map(str, self._O[idx])) if self._O[idx] else "-"
+            path = " > ".join(map(self._number_to_excel_column, self._O[idx])) if self._O[idx] else "-"
 
             terminal_data.append(f"{(ic := str(idx + 1))}{' ' * (15 - len(ic))}{(io := str(assigned_order))}{' ' * (41 - len(io))}{path}")
 
@@ -109,20 +110,33 @@ class Warehouse:
             label = self._font.render(message, True, color)
             self._screen.blit(label, (x + 10, y + 10 + i * 20))  # Offset each line
 
+    def _number_to_excel_column(self, n: int) -> str:
+        '''
+        Converts a number into a Excel-like column header string
+        '''
+        result = ''
+        n += 1
+        while n > 0:
+            n -= 1
+            result = chr(n % 26 + 65) + result
+            n //= 26
+        return result
+
+
     def _draw(self):
         self._screen.fill(self._BG_COLOR)
         
         # Draw the grid
         self._draw_grid()
         
-        # Draw zones with labels
+        # Draw zones with numbers
         for idx, z in enumerate(self._Z):
             pygame.draw.rect(self._screen, self._ZONE_COLOR, (int(z[0]) - 10, int(z[1]) - 10, 20, 20))
             
-            # Create the label for the zone
-            label = self._font.render(f"Z{idx}", True, self._TEXT_COLOR)
+            # Display only the zone number
+            label = self._font.render(self._number_to_excel_column(idx), True, self._ZONE_TEXT_COLOR)
             x_pos = int(z[0] - label.get_width() / 2)
-            y_pos = int(z[1] - label.get_height() / 2) - 15  
+            y_pos = int(z[1] - label.get_height() / 2)
             self._screen.blit(label, (x_pos, y_pos))
         
         # Draw AGVs and arrows
@@ -145,7 +159,7 @@ class Warehouse:
 
             # Draw the AGV
             pygame.draw.circle(self._screen, color, (int(c[0]), int(c[1])), 10)
-            label = self._font.render(f"{idx}", True, self._TEXT_COLOR)
+            label = self._font.render(f"{idx}", True, self._AGV_TEXT_COLOR)
             x_pos = int(c[0] - label.get_width() / 2)
             y_pos = int(c[1] - label.get_height() / 2)
             self._screen.blit(label, (x_pos, y_pos))
@@ -154,3 +168,4 @@ class Warehouse:
         self._draw_terminal()
 
         pygame.display.flip()
+
