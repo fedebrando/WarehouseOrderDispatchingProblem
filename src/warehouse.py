@@ -51,18 +51,23 @@ class Warehouse:
         self._state_monitor.manager_assign_job(policy, o, self._stats)
     
     def _init_graphics(self):
+        '''
+        Initialize pygame graphics
+        '''
         pygame.init()
         self._screen = pygame.display.set_mode((self._W + self._WIDTH_TERMINAL, self._H))  
-        pygame.display.set_caption("Warehouse Simulator")
+        pygame.display.set_caption('Warehouse Simulator')
         self._font = pygame.font.Font(None, 24)
     
     def _generate_terminal_data(self):
-        """Generates a structured table of AGV data for the terminal display."""
+        '''
+        Generates a structured table of AGV data for the terminal display
+        '''
         terminal_data = [f"AGV{' ' * 7}ID assigned order{' ' * 8}Path"]
         
         for idx, c in enumerate(self._C):
             assigned_order = self._O_ids[idx][0] if self._O_ids[idx] else '-'
-            path = " > ".join(map(self._number_to_excel_column, self._O[idx])) if self._O[idx] else "-"
+            path = ' > '.join(map(self._number_to_excel_column, self._O[idx])) if self._O[idx] else '-'
             terminal_data.append(f"{(ic := str(idx + 1))}{' ' * (15 - len(ic))}{(io := str(assigned_order))}{' ' * (41 - len(io))}{path}")
         
         terminal_data.append('')
@@ -73,6 +78,9 @@ class Warehouse:
         return terminal_data
 
     def _update(self):
+        '''
+        Updates data
+        '''
         for idx, c in enumerate(self._C):
             if self._O[idx]:
                 dest = self._Z[self._O[idx][0]]
@@ -90,7 +98,9 @@ class Warehouse:
                         self._O_ids[idx].pop(0)
 
     def _draw_grid(self):
-        """Draws a grid on the warehouse floor."""
+        '''
+        Draws a grid on the warehouse floor
+        '''
         grid_size = 50  # Size of each grid square
         for x in range(0, self._W, grid_size):
             pygame.draw.line(self._screen, self._GRID_COLOR, (x, 0), (x, self._H))
@@ -98,7 +108,9 @@ class Warehouse:
             pygame.draw.line(self._screen, self._GRID_COLOR, (0, y), (self._W, y))
 
     def _draw_terminal(self):
-        """Draws a structured terminal-style display in the top-right corner."""
+        '''
+        Draws a structured terminal-style display in the top-right corner
+        '''
         x, y = self._W, 0  # Position in the top-right corner
 
         # Draw a semi-transparent rectangle
@@ -126,8 +138,10 @@ class Warehouse:
             n //= 26
         return result
 
-
     def _draw(self):
+        '''
+        Draws a single frame
+        '''
         self._screen.fill(self._BG_COLOR)
         
         # Draw the grid
@@ -163,7 +177,7 @@ class Warehouse:
 
             # Draw the AGV
             pygame.draw.circle(self._screen, color, (int(c[0]), int(c[1])), 10)
-            label = self._font.render(f"{idx}", True, self._AGV_TEXT_COLOR)
+            label = self._font.render(f'{idx}', True, self._AGV_TEXT_COLOR)
             x_pos = int(c[0] - label.get_width() / 2)
             y_pos = int(c[1] - label.get_height() / 2)
             self._screen.blit(label, (x_pos, y_pos))
