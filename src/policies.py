@@ -6,7 +6,7 @@ def RR(o: DynamicOrder, Z: np.array, C: np.array, V: np.array, O: list[list[int]
     '''
     Round Robin
     '''
-    if not hasattr(RR, "valore"):
+    if not hasattr(RR, 'valore'):
         RR.valore = -1
     RR.valore = (RR.valore + 1) % len(C)
     i = RR.valore

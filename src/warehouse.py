@@ -1,4 +1,3 @@
-
 import pygame
 import numpy as np
 import math
@@ -12,17 +11,18 @@ class Warehouse:
     Warehouse Simulator
     '''
     _GRID_COLOR = (50, 50, 50)
-    _WIDTH, _HEIGHT = 500, 500
+    _WIDTH_TERMINAL = 350
     _BG_COLOR = (30, 30, 30)
     _ZONE_COLOR = (100, 100, 100)
     _TEXT_COLOR = (30, 30, 30)
     _AGV_COLOR_IDLE = (0, 255, 0)
     _AGV_COLOR_BUSY = (255, 0, 0)
 
-    def __init__(self, W: int, H: int, Z: list[list[float]], C: list[list[float]], V: list[float], P: float):
+    def __init__(self, Z: list[list[float]], C: list[list[float]], V: list[float], P: float):
+        all_pos = Z + C
+        self._W = max(x for [x, _] in all_pos) + min(x for [x, _] in all_pos)
+        self._H = max(y for [_, y] in all_pos) + min(y for [_, y] in all_pos)
         self._init_graphics()
-        self._W = W
-        self._H = H
         self._state_monitor = StateMonitor(Z, C, V, P)
         self._running = True
         self._stats = Stats()
@@ -51,10 +51,22 @@ class Warehouse:
     
     def _init_graphics(self):
         pygame.init()
-        self._screen = pygame.display.set_mode((self._WIDTH, self._HEIGHT))  # Define the window here
+        self._screen = pygame.display.set_mode((self._W + self._WIDTH_TERMINAL, self._H))  
         pygame.display.set_caption("Warehouse Simulator")
         self._font = pygame.font.Font(None, 24)
     
+    def _generate_terminal_data(self):
+        """Generates a structured table of AGV data for the terminal display."""
+        terminal_data = [f"AGV{' ' * 7}ID assigned order{' ' * 8}Path"]
+        
+        for idx, c in enumerate(self._C):
+            assigned_order = self._O_ids[idx][0] if self._O_ids[idx] else '-'
+            path = " -> ".join(map(str, self._O[idx])) if self._O[idx] else "-"
+
+            terminal_data.append(f"{(ic := str(idx + 1))}{' ' * (15 - len(ic))}{(io := str(assigned_order))}{' ' * (41 - len(io))}{path}")
+
+        return terminal_data
+
     def _update(self):
         for idx, c in enumerate(self._C):
             if self._O[idx]:
@@ -68,21 +80,35 @@ class Warehouse:
                 else:
                     self._C[idx] = dest
                     self._O[idx].pop(0)
-                    if len(self._O[idx]) % 2 == 0: # the order is executed (drop zone has been just removed)
+                    if len(self._O[idx]) % 2 == 0:  # The order is executed (drop zone just removed)
                         self._stats.order_executed(self._O_ids[idx][0])
                         self._O_ids[idx].pop(0)
-                        print('Mean waiting time:', self._stats.mean_waiting_time(), 's')
-                        print('Mean distance', self._stats.mean_distance(), 'm')
-                        print('Mean consumption:', self._stats.mean_consumption(), 'J')
-            
+
     def _draw_grid(self):
-        # Draw the grid
-        grid_size = 50
+        """Draws a grid on the warehouse floor."""
+        grid_size = 50  # Size of each grid square
         for x in range(0, self._W, grid_size):
             pygame.draw.line(self._screen, self._GRID_COLOR, (x, 0), (x, self._H))
         for y in range(0, self._H, grid_size):
             pygame.draw.line(self._screen, self._GRID_COLOR, (0, y), (self._W, y))
-    
+
+    def _draw_terminal(self):
+        """Draws a structured terminal-style display in the top-right corner."""
+        x, y = self._W, 0  # Position in the top-right corner
+
+        # Draw a semi-transparent rectangle
+        terminal_surface = pygame.Surface((self._WIDTH_TERMINAL, self._H), pygame.SRCALPHA)
+        terminal_surface.fill((0, 0, 0, 200))  # Semi-transparent black
+        self._screen.blit(terminal_surface, (x, y))
+
+        # Get terminal data and render it
+        terminal_data = self._generate_terminal_data()
+        
+        for i, message in enumerate(terminal_data):
+            color = (255, 215, 0) if i == 0 else (255, 255, 255)  # Title in gold, rest in white
+            label = self._font.render(message, True, color)
+            self._screen.blit(label, (x + 10, y + 10 + i * 20))  # Offset each line
+
     def _draw(self):
         self._screen.fill(self._BG_COLOR)
         
@@ -95,25 +121,19 @@ class Warehouse:
             
             # Create the label for the zone
             label = self._font.render(f"Z{idx}", True, self._TEXT_COLOR)
-
-            # Calculate the position of the text centered above the zone
-            label_width = label.get_width()
-            label_height = label.get_height()
-            x_pos = int(z[0] - label_width / 2)
-            y_pos = int(z[1] - label_height / 2) - 15  # Move slightly above the zone
-
+            x_pos = int(z[0] - label.get_width() / 2)
+            y_pos = int(z[1] - label.get_height() / 2) - 15  
             self._screen.blit(label, (x_pos, y_pos))
         
-        # Draw AGVs and direction arrows
+        # Draw AGVs and arrows
         for idx, c in enumerate(self._C):
             color = self._AGV_COLOR_BUSY if self._O[idx] else self._AGV_COLOR_IDLE
 
-            # Draw the arrow before the AGVs
+            # Draw direction arrow if AGV has an order
             if self._O[idx]:
                 destination = self._Z[self._O[idx][0]]
                 angle = math.atan2(destination[1] - c[1], destination[0] - c[0])
 
-                # Create the arrow
                 arrow_length = 20
                 arrow_width = 5
                 arrow_points = [
@@ -121,20 +141,16 @@ class Warehouse:
                     (c[0] + math.cos(angle + math.pi / 6) * arrow_width, c[1] + math.sin(angle + math.pi / 6) * arrow_width),
                     (c[0] + math.cos(angle - math.pi / 6) * arrow_width, c[1] + math.sin(angle - math.pi / 6) * arrow_width),
                 ]
-                pygame.draw.polygon(self._screen, color, arrow_points)  # Use the same color as the AGV
+                pygame.draw.polygon(self._screen, color, arrow_points)
 
-            # Then draw the AGV over the arrow
+            # Draw the AGV
             pygame.draw.circle(self._screen, color, (int(c[0]), int(c[1])), 10)
-            
-            # Calculate the AGV number to display in the center
             label = self._font.render(f"{idx}", True, self._TEXT_COLOR)
-
-            # Calculate the position of the text centered inside the AGV
-            label_width = label.get_width()
-            label_height = label.get_height()
-            x_pos = int(c[0] - label_width / 2)
-            y_pos = int(c[1] - label_height / 2)
-
+            x_pos = int(c[0] - label.get_width() / 2)
+            y_pos = int(c[1] - label.get_height() / 2)
             self._screen.blit(label, (x_pos, y_pos))
+
+        # Draw the terminal box
+        self._draw_terminal()
 
         pygame.display.flip()
