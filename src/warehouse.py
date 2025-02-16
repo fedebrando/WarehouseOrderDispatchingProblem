@@ -63,8 +63,12 @@ class Warehouse:
         for idx, c in enumerate(self._C):
             assigned_order = self._O_ids[idx][0] if self._O_ids[idx] else '-'
             path = " > ".join(map(self._number_to_excel_column, self._O[idx])) if self._O[idx] else "-"
-
             terminal_data.append(f"{(ic := str(idx + 1))}{' ' * (15 - len(ic))}{(io := str(assigned_order))}{' ' * (41 - len(io))}{path}")
+        
+        terminal_data.append('')
+        terminal_data.append(f'Mean waiting time: {self._stats.mean_waiting_time():.2f} s')
+        terminal_data.append(f'Mean distance: {self._stats.mean_distance():.2f} m')
+        terminal_data.append(f'Mean consumption: {self._stats.mean_consumption():.2f} J')
 
         return terminal_data
 

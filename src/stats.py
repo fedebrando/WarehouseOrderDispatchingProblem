@@ -44,7 +44,7 @@ class Stats:
         '''
         Returns mean waiting time so far
         '''
-        return self._sum_waiting_time / self._len_executed_orders
+        return self._sum_waiting_time / self._len_executed_orders if self._len_executed_orders else 0
     
     # Distance and Consumption
 
@@ -63,10 +63,10 @@ class Stats:
         '''
         Returns mean distance so far
         '''
-        return self._sum_distance / self._len_distances
+        return self._sum_distance / self._len_distances if self._len_distances else 0
     
     def mean_consumption(self) -> float:
         '''
         Returns mean consumption so far
         '''
-        return self._sum_consumption / self._len_distances
+        return self._sum_consumption / self._len_distances if self._len_distances else 0
