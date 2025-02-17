@@ -16,7 +16,6 @@ class OrderManager:
     def __init__(self, warehouse: Warehouse, policy: Callable[[DynamicOrder, np.array, np.array, np.array, list[list[int]]], int]):
         self._warehouse = warehouse
         self._orders = self._read_orders()
-        print(self._orders)
         self._policy = policy
 
     def start(self):
@@ -28,11 +27,14 @@ class OrderManager:
     def _order_managing(self):
         t0 = time.time()
         for i, order in enumerate(self._orders):
-            time.sleep(max(t0 + order.get_t_arr() - time.time(), 0))
-            self._warehouse.assign_job(self._policy, order)
+            time_diff = t0 + order.get_t_arr() - time.time()
+            time.sleep(max(time_diff, 0))
+            self._warehouse.assign_job(self._policy, order, time_diff)
 
     def _read_orders(self) -> list[DynamicOrder]:
-        '''Reads the orders from a CSV file and returns a list of DynamicOrder objects.'''
+        '''
+        Reads the orders from a CSV file and returns a list of DynamicOrder objects
+        '''
         orders = []
         with open(os.path.join('..', 'data', 'orders.csv'), mode='r', newline='') as file:
             reader = csv.reader(file)

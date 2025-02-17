@@ -24,6 +24,9 @@ class Stats:
         self._len_distances = 0
         self._sum_consumption = 0
 
+        # Delays
+        self._order_delays = {} # delays in order managing
+
     # Waiting time
 
     def order_arrival(self, order_id: int):
@@ -70,3 +73,20 @@ class Stats:
         Returns mean consumption so far
         '''
         return self._sum_consumption / self._len_distances if self._len_distances else 0
+    
+    # Delays
+
+    def new_time_diff(self, order_id: int, time_diff: float):
+        '''
+        Store time_diff as a delay if it is negative
+        '''
+        if time_diff < 0:
+            self._order_delays[order_id] = -time_diff
+
+    def delay_of(self, order_id: int) -> float:
+        '''
+        Returns delay in received order managing
+        '''
+        if order_id in self._order_delays:
+            return self._order_delays[order_id]
+        return 0

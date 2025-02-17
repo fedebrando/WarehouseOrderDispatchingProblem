@@ -10,8 +10,14 @@ class Warehouse:
     '''
     Warehouse Simulator
     '''
+    _SHORT_DELAY = (255, 153, 0)
+    _MID_DELAY = (255, 0, 0)
+    _STRONG_DELAY = (153, 0, 255)
+
     _GRID_COLOR = (50, 50, 50)
-    _WIDTH_TERMINAL = 350
+    _WIDTH_TERMINAL = 500
+    _TERMINAL_DEFAULT_COLOR = (255, 255, 255)
+    _TERMINAL_HEADER_COLOR = (255, 215, 0)
     _BG_COLOR = (30, 30, 30)
     _ZONE_COLOR = (100, 100, 100)
     _ZONE_TEXT_COLOR = (175, 175, 175)
@@ -19,14 +25,22 @@ class Warehouse:
     _AGV_COLOR_IDLE = (0, 255, 0)
     _AGV_COLOR_BUSY = (255, 0, 0)
 
-    def __init__(self, Z: list[list[float]], C: list[list[float]], V: list[float], P: float):
+
+    def __init__(self, Z: list[list[float]], C: list[list[float]], V: list[float], P: float, th_short: float = 0, th_mid: float = 5, th_strong: float = 10):
         all_pos = Z + C
         self._W = max(x for [x, _] in all_pos) + min(x for [x, _] in all_pos)
         self._H = max(y for [_, y] in all_pos) + min(y for [_, y] in all_pos)
         self._init_graphics()
         self._state_monitor = StateMonitor(Z, C, V, P)
         self._running = True
+
+        # Statistics
         self._stats = Stats()
+
+        # Delay thresholds
+        self._th_short = th_short
+        self._th_mid = th_mid
+        self._th_strong = th_strong
 
     def start(self):
         '''
@@ -43,11 +57,12 @@ class Warehouse:
             self._state_monitor.agv_end()
             clock.tick(30)  # 30 FPS
 
-    def assign_job(self, policy: Callable[[DynamicOrder, np.array, np.array, np.array, list[list[int]]], int], o: DynamicOrder):
+    def assign_job(self, policy: Callable[[DynamicOrder, np.array, np.array, np.array, list[list[int]]], int], o: DynamicOrder, time_diff: float):
         '''
         Assigns a job to an AGV with specified values
         '''
         self._stats.order_arrival(o.get_id())
+        self._stats.new_time_diff(o.get_id(), time_diff)
         self._state_monitor.manager_assign_job(policy, o, self._stats)
     
     def _init_graphics(self):
@@ -57,24 +72,40 @@ class Warehouse:
         pygame.init()
         self._screen = pygame.display.set_mode((self._W + self._WIDTH_TERMINAL, self._H))  
         pygame.display.set_caption('Warehouse Simulator')
-        self._font = pygame.font.Font(None, 24)
+        self._font = pygame.font.SysFont('Courier', 18)
     
+    def _delay_color(self, delay: float):
+        '''
+        Matches delay with relative color
+        '''
+        if delay > self._th_strong:
+            return self._STRONG_DELAY
+        if delay > self._th_mid:
+            return self._MID_DELAY
+        if delay > self._th_short:
+            return self._SHORT_DELAY
+        return self._TERMINAL_DEFAULT_COLOR
+
     def _generate_terminal_data(self):
         '''
         Generates a structured table of AGV data for the terminal display
         '''
-        terminal_data = [f"AGV{' ' * 7}ID assigned order{' ' * 8}Path"]
+        header = f"{'AGV':<5}{'Delay (s)':<11}{'Order ID':<10}{'Path'}"
+        terminal_data = [(header, self._TERMINAL_HEADER_COLOR)]
         
         for idx, c in enumerate(self._C):
-            assigned_order = self._O_ids[idx][0] if self._O_ids[idx] else '-'
+            assigned_order = f'{self._O_ids[idx][0]}' if self._O_ids[idx] else '-'
             path = ' > '.join(map(self._number_to_excel_column, self._O[idx])) if self._O[idx] else '-'
-            terminal_data.append(f"{(ic := str(idx + 1))}{' ' * (15 - len(ic))}{(io := str(assigned_order))}{' ' * (41 - len(io))}{path}")
-        
-        terminal_data.append('')
-        terminal_data.append(f'Mean waiting time: {self._stats.mean_waiting_time():.2f} s')
-        terminal_data.append(f'Mean distance: {self._stats.mean_distance():.2f} m')
-        terminal_data.append(f'Mean consumption: {self._stats.mean_consumption():.2f} J')
+            d = self._stats.delay_of(self._O_ids[idx][0]) if self._O_ids[idx] else 0
+            delay = f'{d:.2f}' if d > 0 else '-'
+            terminal_data.append((f"{str(idx + 1):<5}{f'{delay}':<11}{assigned_order:<10}{path}", self._delay_color(d)))
 
+        terminal_data.append(('', self._TERMINAL_DEFAULT_COLOR))
+
+        terminal_data.append((f"{'Mean waiting time':<20}{self._stats.mean_waiting_time():.2f} s", self._TERMINAL_DEFAULT_COLOR))
+        terminal_data.append((f"{'Mean distance':<20}{self._stats.mean_distance():.2f} m", self._TERMINAL_DEFAULT_COLOR))
+        terminal_data.append((f"{'Mean consumption':<20}{self._stats.mean_consumption():.2f} J", self._TERMINAL_DEFAULT_COLOR))
+        
         return terminal_data
 
     def _update(self):
@@ -121,8 +152,7 @@ class Warehouse:
         # Get terminal data and render it
         terminal_data = self._generate_terminal_data()
         
-        for i, message in enumerate(terminal_data):
-            color = (255, 215, 0) if i == 0 else (255, 255, 255)  # Title in gold, rest in white
+        for i, (message, color) in enumerate(terminal_data):
             label = self._font.render(message, True, color)
             self._screen.blit(label, (x + 10, y + 10 + i * 20))  # Offset each line
 
