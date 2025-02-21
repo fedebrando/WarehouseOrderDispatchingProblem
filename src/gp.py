@@ -77,7 +77,7 @@ def fitness(individual, orders):
 
         # apply policy
         t_start_eval = time.time()
-        goodnesses = np.array([func_sig(Z[idx_z_pick][0], Z[idx_z_pick][1], Z[idx_z_drop][0], Z[idx_z_drop][1], c_x, c_y, v) for [c_x, c_y], v in zip(C, V)], dtype=float)
+        goodnesses = np.array([func_sig(Z[idx_z_pick][0], Z[idx_z_pick][1], Z[idx_z_drop][0], Z[idx_z_drop][1], c[0], c[1], v) for c, v in zip(C, V)], dtype=float)
         print('Goodnesses:', goodnesses)
         idxs_available = np.array([i for i in range(len(C)) if not O[i]], dtype=int)
         print('Idxs available:', idxs_available)
