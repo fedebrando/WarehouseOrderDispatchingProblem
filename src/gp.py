@@ -3,6 +3,7 @@ import operator
 import math
 import random
 import numpy as np
+import time
 
 from deap import algorithms, base, creator, tools, gp
 from policies import d
@@ -60,23 +61,66 @@ def fitness(individual, orders):
     func_sig = lambda *x : sigmoid(func(*x))
 
     sum_waiting_time = 0
-    Z = [[100, 100], [250, 100], [400, 100], [100, 400], [250, 400], [400, 400]]
-    C = [[150, 250], [250, 250], [350, 250]]
-    V = [1] * 3
+    t_curr = 0
+    Z = np.array([[100, 100], [250, 100], [400, 100], [100, 400], [250, 400], [400, 400]], dtype=float)
+    C = np.array([[150, 250], [250, 250], [350, 250]], dtype=float)
+    C_t_last_update = np.array([0] * len(C), dtype=float)
+    V = np.array([1] * 3, dtype=float)
     P = 500
     O = [[] for _ in range(len(C))]
     
     for order in orders:
         t_arr, idx_z_pick, idx_z_drop = order
+
+        # now
+        t_curr = max(t_arr, t_curr)
+
+        # apply policy
+        t_start_eval = time.time()
         goodnesses = np.array([func_sig(Z[idx_z_pick][0], Z[idx_z_pick][1], Z[idx_z_drop][0], Z[idx_z_drop][1], c_x, c_y, v) for [c_x, c_y], v in zip(C, V)], dtype=float)
         print('Goodnesses:', goodnesses)
         idxs_available = np.array([i for i in range(len(C)) if not O[i]], dtype=int)
         print('Idxs available:', idxs_available)
         idx_best_available = idxs_available[np.argmax(goodnesses[idxs_available])]
         print('Best:', idx_best_available)
+        O[idx_best_available] += [idx_z_pick, idx_z_drop]
+        t_end_eval = time.time()
 
-        distance = d(C[idx_best_available], Z[idx_z_pick]) + d(Z[idx_z_pick], Z[idx_z_drop])
-        sum_waiting_time += distance / V[idx_best_available]
+        # now
+        t_curr += t_end_eval - t_start_eval
+
+        # delivery time
+        delivery_pos_pick_time = d(C[idx_best_available], Z[idx_z_pick]) / V[idx_best_available]
+        delivery_pick_drop_time = d(Z[idx_z_pick], Z[idx_z_drop]) / V[idx_best_available]
+        delivery_time = delivery_pos_pick_time + delivery_pick_drop_time
+
+        # add waiting time for this order
+        sum_waiting_time = (t_curr - t_arr) + delivery_time
+
+        # update state
+        for i in range(len(C)):
+            while O[i]:
+                print('A')
+                dest = Z[O[i][0]]
+                direction = dest - C[i]
+                distance = np.linalg.norm(direction)
+                direction /= np.linalg.norm(direction)
+
+                remaining_time = distance / V[i]
+                elapsed_time = t_curr - C_t_last_update[i]
+
+                if elapsed_time < remaining_time:
+                    ds = V[i] * elapsed_time
+                    C[i] = C[i] + ds * direction
+                    C_t_last_update[i] = t_curr
+                    break
+                else: # elapsed_time >= remaining_time
+                    C[i] = dest
+                    O[i].pop(0)
+                    if O[i]:
+                        C_t_last_update = t_curr - (elapsed_time - remaining_time)
+                    else:
+                        C_t_last_update = t_curr
 
     return sum_waiting_time / len(orders),
 
