@@ -16,9 +16,16 @@ def RR(o: DynamicOrder, Z: np.array, C: np.array, V: np.array, O: list[list[int]
         i = (i + 1) % len(O)
     return i
 
-def d(p1: tuple[float, float], p2: tuple[float, float]):
+def path_length(*path: tuple[float, float]) -> float:
     '''
-    Squared distance between two point
+    Returns length of the received path
+    '''
+    path = list(path)
+    return sum(d(path[i], path[i+1]) for i in range(len(path) - 1))
+
+def d(p1: tuple[float, float], p2: tuple[float, float]) -> float:
+    '''
+    Returns squared distance between two point
     '''
     return ((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2) ** 0.5
 

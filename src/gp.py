@@ -6,7 +6,7 @@ import numpy as np
 import time
 
 from deap import algorithms, base, creator, tools, gp
-from policies import d
+from policies import path_length
 
 # Define a protected division function to handle division by zero
 def protected_div(left, right):
@@ -59,6 +59,13 @@ def sigmoid(x):
 def fitness(individual, orders):
     func = toolbox.compile(expr=individual)
     func_sig = lambda *x : sigmoid(func(*x))
+    def policy(Z, C, V, O, idx_z_pick, idx_z_drop):
+        goodnesses = np.array(
+            [func_sig(Z[idx_z_pick][0], Z[idx_z_pick][1], Z[idx_z_drop][0], Z[idx_z_drop][1], c[0], c[1], v) for c, v in zip(C, V)],
+            dtype=float
+        )
+        idxs_available = np.array([i for i in range(len(C)) if not O[i]], dtype=int)
+        return idxs_available[np.argmax(goodnesses[idxs_available])]
 
     sum_waiting_time = 0
     t_curr = 0
@@ -77,30 +84,23 @@ def fitness(individual, orders):
 
         # apply policy
         t_start_eval = time.time()
-        goodnesses = np.array([func_sig(Z[idx_z_pick][0], Z[idx_z_pick][1], Z[idx_z_drop][0], Z[idx_z_drop][1], c[0], c[1], v) for c, v in zip(C, V)], dtype=float)
-        print('Goodnesses:', goodnesses)
-        idxs_available = np.array([i for i in range(len(C)) if not O[i]], dtype=int)
-        print('Idxs available:', idxs_available)
-        idx_best_available = idxs_available[np.argmax(goodnesses[idxs_available])]
-        print('Best:', idx_best_available)
+        idx_best_available = policy(Z, C, V, O, idx_z_pick, idx_z_drop)
         O[idx_best_available] += [idx_z_pick, idx_z_drop]
         t_end_eval = time.time()
 
         # now
         t_curr += t_end_eval - t_start_eval
+        C_t_last_update[idx_best_available] = t_curr
 
         # delivery time
-        delivery_pos_pick_time = d(C[idx_best_available], Z[idx_z_pick]) / V[idx_best_available]
-        delivery_pick_drop_time = d(Z[idx_z_pick], Z[idx_z_drop]) / V[idx_best_available]
-        delivery_time = delivery_pos_pick_time + delivery_pick_drop_time
+        delivery_time = path_length(C[idx_best_available], Z[idx_z_pick], Z[idx_z_drop]) / V[idx_best_available]
 
         # add waiting time for this order
-        sum_waiting_time = (t_curr - t_arr) + delivery_time
+        sum_waiting_time += (t_curr - t_arr) + delivery_time
 
         # update state
         for i in range(len(C)):
             while O[i]:
-                print('A')
                 dest = Z[O[i][0]]
                 direction = dest - C[i]
                 distance = np.linalg.norm(direction)
@@ -118,14 +118,14 @@ def fitness(individual, orders):
                     C[i] = dest
                     O[i].pop(0)
                     if O[i]:
-                        C_t_last_update = t_curr - (elapsed_time - remaining_time)
+                        C_t_last_update[i] = t_curr - (elapsed_time - remaining_time)
                     else:
-                        C_t_last_update = t_curr
+                        C_t_last_update[i] = t_curr
 
     return sum_waiting_time / len(orders),
 
 # Register evaluation, selection, crossover, and mutation operators
-toolbox.register('evaluate', fitness, orders=[(3.0, 0, 1)])
+toolbox.register('evaluate', fitness, orders=[(3.0, 0, 1), (4.0, 2, 3)])
 toolbox.register('select', tools.selTournament, tournsize=3)
 toolbox.register('mate', gp.cxOnePoint)
 toolbox.register('expr_mut', gp.genFull, min_=0, max_=2)
@@ -139,7 +139,7 @@ def main():
     random.seed(211)
     
     # Initialize population and Hall of Fame
-    pop = toolbox.population(n=300)
+    pop = toolbox.population(n=1)
     hof = tools.HallOfFame(1)
     
     # Define statistics tracking
@@ -152,7 +152,7 @@ def main():
     mstats.register('max', np.max)
     
     # Run the evolutionary algorithm
-    pop, log = algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.1, ngen=40,
+    pop, log = algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.1, ngen=1,
                                    stats=mstats, halloffame=hof, verbose=True)
     
     return pop, log, hof
