@@ -10,6 +10,8 @@ class Warehouse:
     '''
     Warehouse Simulator
     '''
+    _FPS = 30
+
     _SHORT_DELAY = (255, 153, 0)
     _MID_DELAY = (255, 0, 0)
     _STRONG_DELAY = (153, 0, 255)
@@ -24,7 +26,6 @@ class Warehouse:
     _AGV_TEXT_COLOR = (30, 30, 30)
     _AGV_COLOR_IDLE = (0, 255, 0)
     _AGV_COLOR_BUSY = (255, 0, 0)
-
 
     def __init__(self, Z: list[list[float]], C: list[list[float]], V: list[float], P: float, th_short: float = 0, th_mid: float = 5, th_strong: float = 10):
         all_pos = Z + C
@@ -55,7 +56,7 @@ class Warehouse:
             self._update()
             self._draw()
             self._state_monitor.agv_end()
-            clock.tick(30)  # 30 FPS
+            clock.tick(self._FPS)
 
     def assign_job(self, policy: Callable[[DynamicOrder, np.array, np.array, np.array, list[list[int]]], int], o: DynamicOrder, time_diff: float):
         '''
@@ -118,8 +119,10 @@ class Warehouse:
                 direction = dest - c
                 distance = np.linalg.norm(direction)
                 
-                if distance > self._V[idx]:
-                    shift = (direction / distance) * self._V[idx]
+                ds = self._V[idx] * (1 / self._FPS)
+
+                if distance > ds:
+                    shift = (direction / distance) * ds
                     self._C[idx] += shift
                 else:
                     self._C[idx] = dest
