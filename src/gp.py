@@ -4,9 +4,12 @@ import math
 import random
 import numpy as np
 import time
+import os
 
 from deap import algorithms, base, creator, tools, gp
 from policies import path_length
+from reading_data import read_data
+from dynamic_order import DynamicOrder
 
 # Define a protected division function to handle division by zero
 def protected_div(left, right):
@@ -56,7 +59,7 @@ def sigmoid(x):
 
 
 # Evaluation function for symbolic regression
-def fitness(individual, orders):
+def fitness(individual, orders: list[DynamicOrder]):
     func = toolbox.compile(expr=individual)
     func_sig = lambda *x : sigmoid(func(*x))
     def policy(Z, C, V, O, idx_z_pick, idx_z_drop):
@@ -77,7 +80,8 @@ def fitness(individual, orders):
     O = [[] for _ in range(len(C))]
     
     for order in orders:
-        t_arr, idx_z_pick, idx_z_drop = order
+        print('***')
+        t_arr, idx_z_pick, idx_z_drop = order.get_t_arr(), order.get_pick(), order.get_drop()
 
         # now
         t_curr = max(t_arr, t_curr)
@@ -99,33 +103,54 @@ def fitness(individual, orders):
         sum_waiting_time += (t_curr - t_arr) + delivery_time
 
         # update state
-        for i in range(len(C)):
-            while O[i]:
-                dest = Z[O[i][0]]
-                direction = dest - C[i]
-                distance = np.linalg.norm(direction)
-                direction /= np.linalg.norm(direction)
+        first_time = True
+        t_curr_updated = False
+        while all(O) or first_time:
+            if first_time:
+                first_time = False
+            elif not t_curr_updated:
+                i_min, dt_min = sorted(
+                    [(i, path_length(C[i], *[Z[o] for o in O[i]]) / V[i]) for i in range(len(C))],
+                    key=lambda i_dt : i_dt[1]
+                )[0]
+                print('i_min:', i_min)
+                t_curr += dt_min
+                t_curr_updated = True
+            else:
+                C[i_min] = Z[O[i_min][-1]]
+                O[i_min].clear()
+                break
+                
+            for i in range(len(C)):
+                while O[i]:
+                    dest = Z[O[i][0]]
+                    direction = dest - C[i]
+                    distance = np.linalg.norm(direction)
+                    if distance:
+                        direction /= distance
 
-                remaining_time = distance / V[i]
-                elapsed_time = t_curr - C_t_last_update[i]
+                    remaining_time = distance / V[i]
+                    elapsed_time = t_curr - C_t_last_update[i]
 
-                if elapsed_time < remaining_time:
-                    ds = V[i] * elapsed_time
-                    C[i] = C[i] + ds * direction
-                    C_t_last_update[i] = t_curr
-                    break
-                else: # elapsed_time >= remaining_time
-                    C[i] = dest
-                    O[i].pop(0)
-                    if O[i]:
-                        C_t_last_update[i] = t_curr - (elapsed_time - remaining_time)
-                    else:
+                    if elapsed_time < remaining_time:
+                        ds = V[i] * elapsed_time
+                        C[i] = C[i] + ds * direction
                         C_t_last_update[i] = t_curr
+                        print(i, C[i], O[i])
+                        break
+                    else: # elapsed_time >= remaining_time
+                        C[i] = dest
+                        O[i].pop(0)
+                        if O[i]:
+                            C_t_last_update[i] = t_curr - (elapsed_time - remaining_time)
+                        else:
+                            C_t_last_update[i] = t_curr
+                    print(i, C[i], O[i])
 
     return sum_waiting_time / len(orders),
 
 # Register evaluation, selection, crossover, and mutation operators
-toolbox.register('evaluate', fitness, orders=[(3.0, 0, 1), (4.0, 2, 3)])
+toolbox.register('evaluate', fitness, orders=read_data(os.path.join('..', 'data', 'orders.csv')))
 toolbox.register('select', tools.selTournament, tournsize=3)
 toolbox.register('mate', gp.cxOnePoint)
 toolbox.register('expr_mut', gp.genFull, min_=0, max_=2)
