@@ -1,8 +1,17 @@
 
 from dynamic_order import DynamicOrder
+from typing import Callable
 import numpy as np
+from utilities import d
+from gp import decoding
 
-def RR(o: DynamicOrder, Z: np.array, C: np.array, V: np.array, O: list[list[int]]):
+def get_gp_policy(individual) -> Callable[[DynamicOrder, np.array, np.array, np.array, list[list[int]]], int]:
+    '''
+    Returns policy callable function decoded from the received individual
+    '''
+    return decoding(individual)
+
+def RR(o: DynamicOrder, Z: np.array, C: np.array, V: np.array, O: list[list[int]]) -> int:
     '''
     Round Robin
     '''
@@ -16,20 +25,7 @@ def RR(o: DynamicOrder, Z: np.array, C: np.array, V: np.array, O: list[list[int]
         i = (i + 1) % len(O)
     return i
 
-def path_length(*path: tuple[float, float]) -> float:
-    '''
-    Returns length of the received path
-    '''
-    path = list(path)
-    return sum(d(path[i], path[i+1]) for i in range(len(path) - 1))
-
-def d(p1: tuple[float, float], p2: tuple[float, float]) -> float:
-    '''
-    Returns squared distance between two point
-    '''
-    return ((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2) ** 0.5
-
-def NAF(o: DynamicOrder, Z: np.array, C: np.array, V: np.array, O: list[list[int]]):
+def NAF(o: DynamicOrder, Z: np.array, C: np.array, V: np.array, O: list[list[int]]) -> int:
     '''
     Nearest AGV First
     '''
@@ -39,7 +35,7 @@ def NAF(o: DynamicOrder, Z: np.array, C: np.array, V: np.array, O: list[list[int
     idx_freeC = sorted(idx_freeC, key=lambda i_pos : d(i_pos[1], pick_pos))
     return idx_freeC[0][0]
 
-def SPTF(o: DynamicOrder, Z: np.array, C: np.array, V: np.array, O: list[list[int]]):
+def SPTF(o: DynamicOrder, Z: np.array, C: np.array, V: np.array, O: list[list[int]]) -> int:
     '''
     Shortest Processing Time First
     '''

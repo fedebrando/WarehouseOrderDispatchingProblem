@@ -26,7 +26,7 @@ class OrderManager:
     
     def _order_managing(self):
         t0 = time.time()
-        for i, order in enumerate(self._orders):
+        for order in self._orders:
             time_diff = t0 + order.get_t_arr() - time.time()
             time.sleep(max(time_diff, 0))
             self._warehouse.assign_job(self._policy, order, time_diff)
