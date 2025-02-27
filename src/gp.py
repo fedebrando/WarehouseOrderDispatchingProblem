@@ -31,7 +31,6 @@ SUBTREE_MAX_HEIGHT_MUT = 2
 
 
 def sigmoid(x):
-    print('x:', x)
     if x >= 0:
         z = math.exp(-x)
         return 1.0 / (1.0 + z)
@@ -50,12 +49,15 @@ def get_pset() -> gp.PrimitiveSet:
                 return left / right
             except ZeroDivisionError:
                 return 1
+            
+        def rand101():
+            return random.randrange(-1, 1)
 
         get_pset.pset = gp.PrimitiveSet('MAIN', 7)
         get_pset.pset.addPrimitive(operator.add, 2)
         get_pset.pset.addPrimitive(operator.sub, 2)
         get_pset.pset.addPrimitive(operator.mul, 2)
-        get_pset.pset.addPrimitive(protected_div, 2)
+        #get_pset.pset.addPrimitive(protected_div, 2)
         get_pset.pset.addPrimitive(operator.neg, 1)
         get_pset.pset.addPrimitive(math.cos, 1)
         get_pset.pset.addPrimitive(math.sin, 1)
@@ -68,7 +70,7 @@ def get_pset() -> gp.PrimitiveSet:
             ARG5='c_y',
             ARG6='v'
         )
-        get_pset.pset.addEphemeralConstant('rand101', lambda: random.randint(-1, 1))
+        get_pset.pset.addEphemeralConstant('rand101', rand101)
 
     return get_pset.pset
 
@@ -149,7 +151,6 @@ def decoding(individual) -> Callable[[DynamicOrder, np.array, np.array, np.array
             ],
             dtype=float
         )
-        print(goodnesses)
         idxs_available = np.array([i for i in range(len(C)) if not O[i]], dtype=int)
         return idxs_available[np.argmax(goodnesses[idxs_available])]
     
@@ -171,7 +172,6 @@ def fitness(individual, orders: list[DynamicOrder]):
     O = [[] for _ in range(len(C))]
     
     for order in orders:
-        print('***')
         t_arr, idx_z_pick, idx_z_drop = order.get_t_arr(), order.get_pick(), order.get_drop()
 
         # now
@@ -204,7 +204,6 @@ def fitness(individual, orders: list[DynamicOrder]):
                     [(i, path_length(C[i], *[Z[o] for o in O[i]]) / V[i]) for i in range(len(C))],
                     key=lambda i_dt : i_dt[1]
                 )[0]
-                print('i_min:', i_min)
                 t_curr += dt_min
                 t_curr_updated = True
             else:
@@ -227,7 +226,6 @@ def fitness(individual, orders: list[DynamicOrder]):
                         ds = V[i] * elapsed_time
                         C[i] = C[i] + ds * direction
                         C_t_last_update[i] = t_curr
-                        print(i, C[i], O[i])
                         break
                     else: # elapsed_time >= remaining_time
                         C[i] = dest
@@ -236,7 +234,6 @@ def fitness(individual, orders: list[DynamicOrder]):
                             C_t_last_update[i] = t_curr - (elapsed_time - remaining_time)
                         else:
                             C_t_last_update[i] = t_curr
-                    print(i, C[i], O[i])
 
     return sum_waiting_time / len(orders),
 
