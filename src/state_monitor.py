@@ -1,8 +1,9 @@
 
 import threading
 import numpy as np
-from dynamic_order import DynamicOrder
 from typing import Callable
+
+from dynamic_order import DynamicOrder
 from stats import Stats
 
 class StateMonitor:

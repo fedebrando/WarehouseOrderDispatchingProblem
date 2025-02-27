@@ -1,5 +1,6 @@
 
 import pandas as pd
+
 from dynamic_order import DynamicOrder
 
 def read_data(path: str) -> list[DynamicOrder]:

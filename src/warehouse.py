@@ -1,10 +1,12 @@
+
 import pygame
 import numpy as np
 import math
+from typing import Callable
+
 from state_monitor import StateMonitor
 from dynamic_order import DynamicOrder
 from stats import Stats
-from typing import Callable
 
 class Warehouse:
     '''
@@ -219,4 +221,3 @@ class Warehouse:
         self._draw_terminal()
 
         pygame.display.flip()
-

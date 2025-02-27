@@ -1,7 +1,8 @@
 
-from dynamic_order import DynamicOrder
 from typing import Callable
 import numpy as np
+
+from dynamic_order import DynamicOrder
 from utilities import d
 from gp import decoding
 

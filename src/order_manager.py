@@ -2,12 +2,13 @@
 import threading
 import time
 import pygame
-from warehouse import Warehouse
-from dynamic_order import DynamicOrder
 import os
 import csv
 import numpy as np
 from typing import Callable
+
+from warehouse import Warehouse
+from dynamic_order import DynamicOrder
 
 class OrderManager:
     '''
