@@ -15,11 +15,11 @@ from initial_state import InitialState
 
 SEED = 765
 
-N_GEN = 2
+N_GEN = 100
 POP_SIZE = 100
 
 INIT_MIN_HEIGHT = 1
-INIT_MAX_HEIGHT = 2
+INIT_MAX_HEIGHT = 5
 
 P_CROSSOVER = 0.5
 LIMIT_HEIGHT_CROSSOVER = 17
@@ -74,9 +74,10 @@ def get_pset() -> gp.PrimitiveSet:
 
     return get_pset.pset
 
-def get_toolbox(pset) -> base.Toolbox:
+def get_toolbox(pset, simulation: bool = False) -> base.Toolbox:
     '''
     Returns the toolbox defined from received values if it is called the first time, else already defined toolbox
+    (If `simulation` is `True` it doesn't read orders)
     '''
     if not hasattr(get_toolbox, 'toolbox'):
         # Set fitness function
@@ -95,7 +96,7 @@ def get_toolbox(pset) -> base.Toolbox:
         get_toolbox.toolbox.register('compile', gp.compile, pset=pset)
 
         # Register evaluation, selection, crossover, and mutation operators
-        order_list = read_data(os.path.join('..', 'data', 'orders.csv'))
+        order_list = [] if simulation else read_data(os.path.join('..', 'data', 'orders.csv'))
         get_toolbox.toolbox.register('evaluate', fitness, orders=order_list)
         get_toolbox.toolbox.register('select', tools.selTournament, tournsize=3)
         get_toolbox.toolbox.register('mate', gp.cxOnePoint)
@@ -122,11 +123,11 @@ def get_mstats() -> tools.MultiStatistics:
 
     return mstats
 
-def decoding(individual) -> Callable[[DynamicOrder, np.array, np.array, np.array, list[list[int]]], int]:
+def decoding(individual, simulation: bool = False) -> Callable[[DynamicOrder, np.array, np.array, np.array, list[list[int]]], int]:
     '''
     Returns callable function corresponding to the received individual
     '''
-    toolbox = get_toolbox(get_pset())
+    toolbox = get_toolbox(get_pset(), simulation=simulation)
 
     def normalized(val: float, min: float, max: float) -> float:
         return (val - min) / (max - min)
@@ -178,13 +179,10 @@ def fitness(individual, orders: list[DynamicOrder]):
         t_curr = max(t_arr, t_curr)
 
         # apply policy
-        t_start_eval = time.time()
         idx_best_available = policy(order, Z, C, V, O)
         O[idx_best_available] += [idx_z_pick, idx_z_drop]
-        t_end_eval = time.time()
 
         # now
-        t_curr += t_end_eval - t_start_eval
         C_t_last_update[idx_best_available] = t_curr
 
         # delivery time
@@ -235,7 +233,8 @@ def fitness(individual, orders: list[DynamicOrder]):
                         else:
                             C_t_last_update[i] = t_curr
 
-    return sum_waiting_time / len(orders),
+    #print(len(individual), individual)
+    return sum_waiting_time / len(orders) + len(individual) * 10 ** (-4),
 
 def main():
     # Primitive set

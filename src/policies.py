@@ -10,7 +10,7 @@ def get_gp_policy(individual) -> Callable[[DynamicOrder, np.array, np.array, np.
     '''
     Returns policy callable function decoded from the received individual
     '''
-    return decoding(individual)
+    return decoding(individual, simulation=True)
 
 def RR(o: DynamicOrder, Z: np.array, C: np.array, V: np.array, O: list[list[int]]) -> int:
     '''
