@@ -20,12 +20,18 @@ class OrderManager:
         self._policy = policy
 
     def start(self):
+        '''
+        Start execution for order manager thread
+        '''
         manager_th = threading.Thread(target=self._order_managing, daemon=True)
         manager_th.start()
         self._warehouse.start()
         pygame.quit()
     
     def _order_managing(self):
+        '''
+        Order manager thread
+        '''
         t0 = time.time()
         for order in self._orders:
             time_diff = t0 + order.get_t_arr() - time.time()

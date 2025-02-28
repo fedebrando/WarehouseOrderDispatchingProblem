@@ -3,15 +3,15 @@ import operator
 import math
 import random
 import numpy as np
-import time
 import os
 from typing import Callable
-from deap import algorithms, base, creator, tools, gp
+from deap import base, creator, tools, gp
 
 from utilities import path_length
 from reading_data import read_data
 from dynamic_order import DynamicOrder
 from initial_state import InitialState
+from evolution import evolution
 
 SEED = 765
 
@@ -28,7 +28,6 @@ P_MUTATION = 0.1
 LIMIT_HEIGHT_MUTATION = 17
 SUBTREE_MIN_HEIGHT_MUT = 0
 SUBTREE_MAX_HEIGHT_MUT = 2
-
 
 def sigmoid(x):
     if x >= 0:
@@ -74,7 +73,7 @@ def get_pset() -> gp.PrimitiveSet:
 
     return get_pset.pset
 
-def get_toolbox(pset, simulation: bool = False) -> base.Toolbox:
+def get_toolbox(pset: gp.PrimitiveSet, simulation: bool = False) -> base.Toolbox:
     '''
     Returns the toolbox defined from received values if it is called the first time, else already defined toolbox
     (If `simulation` is `True` it doesn't read orders)
@@ -96,8 +95,13 @@ def get_toolbox(pset, simulation: bool = False) -> base.Toolbox:
         get_toolbox.toolbox.register('compile', gp.compile, pset=pset)
 
         # Register evaluation, selection, crossover, and mutation operators
-        order_list = [] if simulation else read_data(os.path.join('..', 'data', 'orders.csv'))
-        get_toolbox.toolbox.register('evaluate', fitness, orders=order_list)
+        orders_train = [] if simulation else read_data(os.path.join('..', 'data', 'orders_train.csv'))
+        orders_val = [] if simulation else read_data(os.path.join('..', 'data', 'orders_val.csv'))
+        orders_test = [] if simulation else read_data(os.path.join('..', 'data', 'orders_test.csv'))
+
+        get_toolbox.toolbox.register('evaluate_train', fitness, orders=orders_train)
+        get_toolbox.toolbox.register('evaluate_val', fitness, orders=orders_val)
+        get_toolbox.toolbox.register('evaluate_test', fitness, orders=orders_test)
         get_toolbox.toolbox.register('select', tools.selTournament, tournsize=3)
         get_toolbox.toolbox.register('mate', gp.cxOnePoint)
         get_toolbox.toolbox.register('expr_mut', gp.genFull, min_=SUBTREE_MIN_HEIGHT_MUT, max_=SUBTREE_MAX_HEIGHT_MUT)
@@ -123,7 +127,7 @@ def get_mstats() -> tools.MultiStatistics:
 
     return mstats
 
-def decoding(individual, simulation: bool = False) -> Callable[[DynamicOrder, np.array, np.array, np.array, list[list[int]]], int]:
+def decoding(individual: gp.PrimitiveTree, simulation: bool = False) -> Callable[[DynamicOrder, np.array, np.array, np.array, list[list[int]]], int]:
     '''
     Returns callable function corresponding to the received individual
     '''
@@ -157,7 +161,7 @@ def decoding(individual, simulation: bool = False) -> Callable[[DynamicOrder, np
     
     return policy
 
-def fitness(individual, orders: list[DynamicOrder]):
+def fitness(individual: gp.PrimitiveTree, orders: list[DynamicOrder]):
     '''
     Fitness function
     '''
@@ -254,12 +258,20 @@ def main():
     mstats = get_mstats()
     
     # Run the evolutionary algorithm
-    pop, log = algorithms.eaSimple(pop, toolbox, cxpb=P_CROSSOVER, mutpb=P_MUTATION, ngen=N_GEN,
-                                   stats=mstats, halloffame=hof, verbose=True)
+    logbook = tools.Logbook()
+    logbook.header = mstats.fields
+    pop = evolution(pop,
+                    toolbox,
+                    cxpb=P_CROSSOVER,
+                    mutpb=P_MUTATION,
+                    ngen=N_GEN,
+                    logbook=logbook,
+                    stats=mstats,
+                    halloffame=hof,
+                    verbose=True)
     print('-- End of evolution --')
     
     best_ind = hof[0]
-    best_func = decoding(best_ind)
     print(f'Best individual: {best_ind}')
     print(f'Best fitness: {best_ind.fitness.values[0]}')
 
