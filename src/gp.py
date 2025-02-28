@@ -15,7 +15,7 @@ from evolution import evolution
 
 SEED = 765
 
-N_GEN = 100
+N_GEN = 1
 POP_SIZE = 100
 
 INIT_MIN_HEIGHT = 1
@@ -260,6 +260,7 @@ def main():
     # Run the evolutionary algorithm
     logbook = tools.Logbook()
     logbook.header = mstats.fields
+    print('-- Start of evolution --')
     pop = evolution(pop,
                     toolbox,
                     cxpb=P_CROSSOVER,
@@ -274,6 +275,7 @@ def main():
     best_ind = hof[0]
     print(f'Best individual: {best_ind}')
     print(f'Best fitness: {best_ind.fitness.values[0]}')
+    print(f'Test score: {toolbox.evaluate_test(best_ind)[0]}')
 
 
 if __name__ == '__main__': # GP entry point
