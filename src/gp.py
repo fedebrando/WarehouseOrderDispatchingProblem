@@ -6,6 +6,7 @@ import numpy as np
 import os
 from typing import Callable
 from deap import base, creator, tools, gp
+import tensorflow as tf
 
 from utilities import path_length
 from reading_data import read_data
@@ -13,13 +14,11 @@ from dynamic_order import DynamicOrder
 from initial_state import InitialState
 from evolution import evolution
 
+RUN_NAME = 'attempt06'
 SEED = 765
 
 N_GEN = 1
-POP_SIZE = 100
-
-INIT_MIN_HEIGHT = 1
-INIT_MAX_HEIGHT = 5
+POP_SIZE = 5
 
 P_CROSSOVER = 0.5
 LIMIT_HEIGHT_CROSSOVER = 17
@@ -28,6 +27,9 @@ P_MUTATION = 0.1
 LIMIT_HEIGHT_MUTATION = 17
 SUBTREE_MIN_HEIGHT_MUT = 0
 SUBTREE_MAX_HEIGHT_MUT = 2
+
+INIT_MIN_HEIGHT = 1
+INIT_MAX_HEIGHT = 5
 
 def sigmoid(x):
     if x >= 0:
@@ -244,6 +246,8 @@ def main():
     # Primitive set
     pset = get_pset()
 
+    #print([lst[0].__name__ for lst in pset.primitives.values()])
+
     # Initialize the toolbox
     toolbox = get_toolbox(pset)    
 
@@ -257,25 +261,54 @@ def main():
     # Define statistics tracking
     mstats = get_mstats()
     
+    # Tensorboard writer
+    log_dir = f'../runs/{RUN_NAME}'
+    writer = tf.summary.create_file_writer(log_dir)
+
+    # Stores on tensorboard information and settings about model and training
+    table = (
+        '| Setting | Value |\n'
+        '|---------|-------|\n'
+        f'| **Seed** | {SEED} |\n'
+        f'| **Generations** | {N_GEN} |\n'
+        f'| **Population size** | {POP_SIZE} |\n'
+        f'| **Crossover probability** | {P_CROSSOVER} |\n'
+        f'| **Max limit height (crossover)** | {LIMIT_HEIGHT_CROSSOVER} |\n'
+        f'| **Mutation probability** | {P_MUTATION} |\n'
+        f'| **Max limit height (mutation)** | {LIMIT_HEIGHT_MUTATION} |\n'
+        f'| **Min limit for subtree height (mutation)** | {SUBTREE_MIN_HEIGHT_MUT} |\n'
+        f'| **Max limit for subtree height (mutation)** | {SUBTREE_MAX_HEIGHT_MUT} |\n'
+        f'| **Min height (initialization)** | {INIT_MIN_HEIGHT} |\n'
+        f'| **Max height (initialization)** | {INIT_MAX_HEIGHT} |\n'
+        f'| **Primitive set** | {str(pset)} |\n'
+    )
+    with writer.as_default():
+        tf.summary.text('Settings', table, step=0)
+
     # Run the evolutionary algorithm
     logbook = tools.Logbook()
     logbook.header = mstats.fields
     print('-- Start of evolution --')
-    pop = evolution(pop,
-                    toolbox,
-                    cxpb=P_CROSSOVER,
-                    mutpb=P_MUTATION,
-                    ngen=N_GEN,
-                    logbook=logbook,
-                    stats=mstats,
-                    halloffame=hof,
-                    verbose=True)
+    pop, best_ind_on_val = evolution(
+        SEED,
+        pop,
+        toolbox,
+        cxpb=P_CROSSOVER,
+        mutpb=P_MUTATION,
+        ngen=N_GEN,
+        logbook=logbook,
+        stats=mstats,
+        halloffame=hof,
+        writer=writer,
+        verbose=True
+    )
     print('-- End of evolution --')
     
-    best_ind = hof[0]
-    print(f'Best individual: {best_ind}')
-    print(f'Best fitness: {best_ind.fitness.values[0]}')
-    print(f'Test score: {toolbox.evaluate_test(best_ind)[0]}')
+    print(f'Best individual: {best_ind_on_val}')
+    print(f'Best fitness: {best_ind_on_val.fitness.values[0]}')
+    print(f'Test score: {toolbox.evaluate_test(best_ind_on_val)[0]}')
+
+    writer.close()
 
 
 if __name__ == '__main__': # GP entry point

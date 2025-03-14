@@ -2,8 +2,10 @@
 from deap import gp, base, tools, algorithms as algo
 from random import randint
 from math import inf
+import tensorflow as tf
 
 def evolution(
+        seed: int,
         population: list[gp.PrimitiveTree],
         toolbox: base.Toolbox,
         cxpb: float,
@@ -12,30 +14,38 @@ def evolution(
         stats: tools.MultiStatistics,
         logbook: tools.Logbook,
         halloffame: tools.HallOfFame,
+        writer: tf.summary,
         verbose: bool = __debug__,
         validate_every: int = 10,
         max_non_imp: int = 1
-    ) -> list[gp.PrimitiveTree]:
+    ) -> tuple[list[gp.PrimitiveTree], gp.PrimitiveTree]:
     '''
     Training and Validation with early stopping
     '''
     best_val_eval = +inf
+    best_ind_on_val = None
     non_imp = 0
 
     elapsed_gens = 0
     pop = population
     while elapsed_gens <= ngen and non_imp <= max_non_imp:
-        pop = eaSimple(pop, toolbox, cxpb, mutpb, min(validate_every, ngen - elapsed_gens), stats, logbook, halloffame, verbose)
+        pop = eaSimple(pop, toolbox, cxpb, mutpb, min(validate_every, ngen - elapsed_gens), stats, logbook, halloffame, writer, verbose)
         elapsed_gens += validate_every
         curr_val_eval, = toolbox.evaluate_val(halloffame[0])
         if curr_val_eval < best_val_eval:
             best_val_eval = curr_val_eval
+            best_ind_on_val = halloffame[0]
             non_imp = 0
+            print('Best-so-far individual on validation updated')
         else:
             non_imp += 1
         print('Validation score:', curr_val_eval, f'[non-improvements: {non_imp}/{max_non_imp}]')
 
-    return pop
+        # add validation score on tensorboard
+        with writer.as_default():
+            tf.summary.scalar("Validation Score (on best-so-far training individual)", best_val_eval, step=elapsed_gens)
+
+    return pop, best_ind_on_val
     
 def eaSimple(
         population: list[gp.PrimitiveTree],
@@ -46,6 +56,7 @@ def eaSimple(
         stats: tools.MultiStatistics,
         logbook: tools.Logbook,
         halloffame: tools.HallOfFame,
+        writer: tf.summary,
         verbose: bool = __debug__,
     ) -> list:
     '''
@@ -103,5 +114,10 @@ def eaSimple(
         logbook.record(gen=gen, nevals=len(invalid_ind), **record)
         if verbose:
             print(logbook.stream)
+
+        # write stats on tensorboard
+        with writer.as_default():
+            tf.summary.scalar('Training Fitness/Avg', record['fitness']['avg'], step=gen)
+            tf.summary.scalar('Training Fitness/Min', record['fitness']['min'], step=gen)
 
     return population
