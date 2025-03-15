@@ -14,7 +14,7 @@ from dynamic_order import DynamicOrder
 from initial_state import InitialState
 from evolution import evolution
 
-RUN_NAME = 'attempt06'
+RUN_NAME = 'attempt01'
 SEED = 765
 
 N_GEN = 1
@@ -30,14 +30,6 @@ SUBTREE_MAX_HEIGHT_MUT = 2
 
 INIT_MIN_HEIGHT = 1
 INIT_MAX_HEIGHT = 5
-
-def sigmoid(x):
-    if x >= 0:
-        z = math.exp(-x)
-        return 1.0 / (1.0 + z)
-    else:
-        z = math.exp(x)
-        return z / (1.0 + z)
 
 def get_pset() -> gp.PrimitiveSet:
     '''
@@ -139,13 +131,11 @@ def decoding(individual: gp.PrimitiveTree, simulation: bool = False) -> Callable
         return (val - min) / (max - min)
 
     func = toolbox.compile(expr=individual)
-    #func_sig = lambda *x : sigmoid(func(*x)) TODO
-    func_sig = func
     def policy(order: DynamicOrder, Z: np.array, C: np.array, V: np.array, O: list[list[int]]) -> int:
         idx_z_pick, idx_z_drop = order.get_pick(), order.get_drop()
         goodnesses = np.array(
             [
-                func_sig(
+                func(
                     normalized(Z[idx_z_pick][0], 0, InitialState.W),
                     normalized(Z[idx_z_pick][1], 0, InitialState.H),
                     normalized(Z[idx_z_drop][0], 0, InitialState.W),
@@ -239,14 +229,11 @@ def fitness(individual: gp.PrimitiveTree, orders: list[DynamicOrder]):
                         else:
                             C_t_last_update[i] = t_curr
 
-    #print(len(individual), individual)
     return sum_waiting_time / len(orders) + len(individual) * 10 ** (-4),
 
 def main():
     # Primitive set
     pset = get_pset()
-
-    #print([lst[0].__name__ for lst in pset.primitives.values()])
 
     # Initialize the toolbox
     toolbox = get_toolbox(pset)    
@@ -266,7 +253,8 @@ def main():
     writer = tf.summary.create_file_writer(log_dir)
 
     # Stores on tensorboard information and settings about model and training
-    table = (
+    print('Store settings on tensorboard...')
+    table_settings = (
         '| Setting | Value |\n'
         '|---------|-------|\n'
         f'| **Seed** | {SEED} |\n'
@@ -280,17 +268,19 @@ def main():
         f'| **Max limit for subtree height (mutation)** | {SUBTREE_MAX_HEIGHT_MUT} |\n'
         f'| **Min height (initialization)** | {INIT_MIN_HEIGHT} |\n'
         f'| **Max height (initialization)** | {INIT_MAX_HEIGHT} |\n'
-        f'| **Primitive set** | {str(pset)} |\n'
+        f'| **Function set** | {', '.join([prim.name for prim in pset.primitives[pset.ret]])} |\n'
+        f'| **Terminal set** | {', '.join([term.name for term in pset.terminals[pset.ret]])} |\n'
     )
     with writer.as_default():
-        tf.summary.text('Settings', table, step=0)
+        tf.summary.text('Settings', table_settings, step=0)
+    print('Done')
 
     # Run the evolutionary algorithm
     logbook = tools.Logbook()
     logbook.header = mstats.fields
+
     print('-- Start of evolution --')
-    pop, best_ind_on_val = evolution(
-        SEED,
+    pop, best_ind_on_val, best_val_eval = evolution(
         pop,
         toolbox,
         cxpb=P_CROSSOVER,
@@ -303,10 +293,20 @@ def main():
         verbose=True
     )
     print('-- End of evolution --')
-    
-    print(f'Best individual: {best_ind_on_val}')
-    print(f'Best fitness: {best_ind_on_val.fitness.values[0]}')
-    print(f'Test score: {toolbox.evaluate_test(best_ind_on_val)[0]}')
+
+    # Stores results on tensorboard
+    print('Store results on tensorboard')
+    table_results = (
+        '| Setting | Value |\n'
+        '|---------|-------|\n'
+        f'| **Best individual** | {best_ind_on_val} |\n'
+        f'| **Best fitness** | {best_ind_on_val.fitness.values[0]} |\n'
+        f'| **Validation score** | {best_val_eval} |\n'
+        f'| **Test score** | {toolbox.evaluate_test(best_ind_on_val)[0]} |\n'
+    )
+    with writer.as_default():
+        tf.summary.text('Results', table_results, step=0)
+    print('Done')
 
     writer.close()
 

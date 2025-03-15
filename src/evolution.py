@@ -5,7 +5,6 @@ from math import inf
 import tensorflow as tf
 
 def evolution(
-        seed: int,
         population: list[gp.PrimitiveTree],
         toolbox: base.Toolbox,
         cxpb: float,
@@ -45,7 +44,7 @@ def evolution(
         with writer.as_default():
             tf.summary.scalar("Validation Score (on best-so-far training individual)", best_val_eval, step=elapsed_gens)
 
-    return pop, best_ind_on_val
+    return pop, best_ind_on_val, best_val_eval
     
 def eaSimple(
         population: list[gp.PrimitiveTree],
