@@ -5,6 +5,7 @@ from math import inf
 import tensorflow as tf
 
 def evolution(
+        weights: tuple[float],
         population: list[gp.PrimitiveTree],
         toolbox: base.Toolbox,
         cxpb: float,
@@ -14,9 +15,9 @@ def evolution(
         logbook: tools.Logbook,
         halloffame: tools.HallOfFame,
         writer: tf.summary,
+        validate_every: int,
+        max_non_imp: int,
         verbose: bool = __debug__,
-        validate_every: int = 10,
-        max_non_imp: int = 1
     ) -> tuple[list[gp.PrimitiveTree], gp.PrimitiveTree]:
     '''
     Training and Validation with early stopping
@@ -28,9 +29,15 @@ def evolution(
     elapsed_gens = 0
     pop = population
     while elapsed_gens <= ngen and non_imp <= max_non_imp:
+        # training
         pop = eaSimple(pop, toolbox, cxpb, mutpb, min(validate_every, ngen - elapsed_gens), stats, logbook, halloffame, writer, verbose)
         elapsed_gens += validate_every
-        curr_val_eval, = toolbox.evaluate_val(halloffame[0])
+
+        # validation
+        obj_values = toolbox.evaluate_val(halloffame[0])
+        curr_val_eval = sum((-w) * obj for w, obj in zip(weights, obj_values))
+
+        # check early stopping
         if curr_val_eval < best_val_eval:
             best_val_eval = curr_val_eval
             best_ind_on_val = halloffame[0]

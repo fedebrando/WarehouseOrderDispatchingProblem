@@ -14,11 +14,14 @@ from dynamic_order import DynamicOrder
 from initial_state import InitialState
 from evolution import evolution
 
-RUN_NAME = 'attempt01'
-SEED = 765
+RUN_NAME = 'attemptAA'
+SEED = 123
+WEIGHTS = (-1.0, -1.0, -1.0, -0.0001)
+VALIDATE_EVERY = 10
 
-N_GEN = 1
+N_GEN = 2
 POP_SIZE = 5
+MAX_NON_IMP = 10
 
 P_CROSSOVER = 0.5
 LIMIT_HEIGHT_CROSSOVER = 17
@@ -74,7 +77,7 @@ def get_toolbox(pset: gp.PrimitiveSet, simulation: bool = False) -> base.Toolbox
     '''
     if not hasattr(get_toolbox, 'toolbox'):
         # Set fitness function
-        creator.create('FitnessMin', base.Fitness, weights=(-1.0,))
+        creator.create('FitnessMin', base.Fitness, weights=WEIGHTS)
 
         # Set individual as tree
         creator.create('Individual', gp.PrimitiveTree, fitness=creator.FitnessMin)
@@ -160,6 +163,9 @@ def fitness(individual: gp.PrimitiveTree, orders: list[DynamicOrder]):
     policy = decoding(individual)
 
     sum_waiting_time = 0
+    sum_distance = 0
+    sum_consumption = 0
+
     t_curr = 0
     Z = np.array(InitialState.Z, dtype=float)
     C = np.array(InitialState.C, dtype=float)
@@ -181,11 +187,14 @@ def fitness(individual: gp.PrimitiveTree, orders: list[DynamicOrder]):
         # now
         C_t_last_update[idx_best_available] = t_curr
 
-        # delivery time
-        delivery_time = path_length(C[idx_best_available], Z[idx_z_pick], Z[idx_z_drop]) / V[idx_best_available]
+        # path distance and delivery time
+        distance = path_length(C[idx_best_available], Z[idx_z_pick], Z[idx_z_drop])
+        delivery_time = distance / V[idx_best_available]
 
-        # add waiting time for this order
+        # add stats for this order
         sum_waiting_time += (t_curr - t_arr) + delivery_time
+        sum_distance += distance
+        sum_consumption += P * delivery_time
 
         # update state
         first_time = True
@@ -229,7 +238,7 @@ def fitness(individual: gp.PrimitiveTree, orders: list[DynamicOrder]):
                         else:
                             C_t_last_update[i] = t_curr
 
-    return sum_waiting_time / len(orders) + len(individual) * 10 ** (-4),
+    return sum_waiting_time / len(orders), sum_distance / len(orders), sum_consumption / len(orders), len(individual),
 
 def main():
     # Primitive set
@@ -258,6 +267,8 @@ def main():
         '| Setting | Value |\n'
         '|---------|-------|\n'
         f'| **Seed** | {SEED} |\n'
+        f'| **Objective weights** | {WEIGHTS} |\n'
+        f'| **Validate every** | {VALIDATE_EVERY} generation{'' if VALIDATE_EVERY == 1 else 's'} |\n'
         f'| **Generations** | {N_GEN} |\n'
         f'| **Population size** | {POP_SIZE} |\n'
         f'| **Crossover probability** | {P_CROSSOVER} |\n'
@@ -270,6 +281,7 @@ def main():
         f'| **Max height (initialization)** | {INIT_MAX_HEIGHT} |\n'
         f'| **Function set** | {', '.join([prim.name for prim in pset.primitives[pset.ret]])} |\n'
         f'| **Terminal set** | {', '.join([term.name for term in pset.terminals[pset.ret]])} |\n'
+        f'| **Early stopping** | After {MAX_NON_IMP} non-improvements |\n'
     )
     with writer.as_default():
         tf.summary.text('Settings', table_settings, step=0)
@@ -281,8 +293,9 @@ def main():
 
     print('-- Start of evolution --')
     pop, best_ind_on_val, best_val_eval = evolution(
-        pop,
-        toolbox,
+        weights=WEIGHTS,
+        population=pop,
+        toolbox=toolbox,
         cxpb=P_CROSSOVER,
         mutpb=P_MUTATION,
         ngen=N_GEN,
@@ -290,7 +303,9 @@ def main():
         stats=mstats,
         halloffame=hof,
         writer=writer,
-        verbose=True
+        validate_every=VALIDATE_EVERY,
+        max_non_imp=MAX_NON_IMP,
+        verbose=True,
     )
     print('-- End of evolution --')
 
