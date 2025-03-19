@@ -14,9 +14,45 @@ from dynamic_order import DynamicOrder
 from initial_state import InitialState
 from evolution import evolution
 
-RUN_NAME = 'attemptAA'
+from utilities import d
+
+def RR(o: DynamicOrder, Z: np.array, C: np.array, V: np.array, O: list[list[int]]) -> int:
+    '''
+    Round Robin
+    '''
+    if not hasattr(RR, 'valore'):
+        RR.valore = -1
+    RR.valore = (RR.valore + 1) % len(C)
+    i = RR.valore
+    while (i + 1) % len(O) != RR.valore:
+        if not O[i]:
+            break
+        i = (i + 1) % len(O)
+    return i
+
+def NAF(o: DynamicOrder, Z: np.array, C: np.array, V: np.array, O: list[list[int]]) -> int:
+    '''
+    Nearest AGV First
+    '''
+    pick = o.get_pick()
+    pick_pos = Z[pick]
+    idx_freeC = filter(lambda i_pos : not bool(O[i_pos[0]]), enumerate(C))
+    idx_freeC = sorted(idx_freeC, key=lambda i_pos : d(i_pos[1], pick_pos))
+    return idx_freeC[0][0]
+
+def SPTF(o: DynamicOrder, Z: np.array, C: np.array, V: np.array, O: list[list[int]]) -> int:
+    '''
+    Shortest Processing Time First
+    '''
+    pick, drop = o.get_pick(), o.get_drop()
+    d_pick_drop = d(Z[pick], Z[drop])
+    idx_freeC = filter(lambda i_pos : not bool(O[i_pos[0]]), enumerate(C))
+    idx_freeC = sorted(idx_freeC, key=lambda i_pos : (d(i_pos[1], Z[pick]) + d_pick_drop) / V[i_pos[0]])
+    return idx_freeC[0][0]
+
+RUN_NAME = 'attempt03'
 SEED = 123
-WEIGHTS = (-1.0, -1.0, -1.0, -0.0001)
+WEIGHTS = (-1.0, -1.0, -1.0, -1.0)
 VALIDATE_EVERY = 10
 
 N_GEN = 2
@@ -114,9 +150,9 @@ def get_mstats() -> tools.MultiStatistics:
     '''
     Returns statistic settings
     '''
-    stats_fit = tools.Statistics(lambda ind : ind.fitness.values)
+    stats_weighted = tools.Statistics(lambda ind: sum((-w) * obj for w, obj in zip(WEIGHTS, ind.fitness.values)))
     stats_size = tools.Statistics(len)
-    mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
+    mstats = tools.MultiStatistics(fitness=stats_weighted, size=stats_size)
     mstats.register('avg', np.mean)
     mstats.register('std', np.std)
     mstats.register('min', np.min)
@@ -156,11 +192,15 @@ def decoding(individual: gp.PrimitiveTree, simulation: bool = False) -> Callable
     
     return policy
 
-def fitness(individual: gp.PrimitiveTree, orders: list[DynamicOrder]):
+def fitness(individual: gp.PrimitiveTree | tuple[Callable[[DynamicOrder, np.array, np.array, np.array, list[list[int]]], int], int], orders: list[DynamicOrder]):
     '''
     Fitness function
     '''
-    policy = decoding(individual)
+    if isinstance(individual, gp.PrimitiveTree):
+        policy = decoding(individual)
+        len_individual = len(individual)
+    else:
+        policy, len_individual = individual
 
     sum_waiting_time = 0
     sum_distance = 0
@@ -238,7 +278,7 @@ def fitness(individual: gp.PrimitiveTree, orders: list[DynamicOrder]):
                         else:
                             C_t_last_update[i] = t_curr
 
-    return sum_waiting_time / len(orders), sum_distance / len(orders), sum_consumption / len(orders), len(individual),
+    return sum_waiting_time / len(orders), sum_distance / len(orders), sum_consumption / len(orders), len_individual
 
 def main():
     # Primitive set
@@ -312,15 +352,28 @@ def main():
     # Stores results on tensorboard
     print('Store results on tensorboard')
     table_results = (
-        '| Setting | Value |\n'
+        '| Name | Value |\n'
         '|---------|-------|\n'
         f'| **Best individual** | {best_ind_on_val} |\n'
-        f'| **Best fitness** | {best_ind_on_val.fitness.values[0]} |\n'
+        f'| **Best fitness** | {sum((-w) * obj for w, obj in zip(WEIGHTS, best_ind_on_val.fitness.values))} |\n'
         f'| **Validation score** | {best_val_eval} |\n'
-        f'| **Test score** | {toolbox.evaluate_test(best_ind_on_val)[0]} |\n'
     )
     with writer.as_default():
         tf.summary.text('Results', table_results, step=0)
+    print('Done')
+
+    # Stores comparisons on tensorboard
+    print('Store comparisons on tensorboard')
+    table_results = (
+        '| Policy | Validation score |\n'
+        '|---------|-------|\n'
+        f'| **GP** | {best_val_eval} |\n'
+        f'| **RR** | {sum((-w) * obj for w, obj in zip(WEIGHTS, toolbox.evaluate_val((RR, 0))))} |\n'
+        f'| **NAF** | {sum((-w) * obj for w, obj in zip(WEIGHTS, toolbox.evaluate_val((NAF, 0))))} |\n'
+        f'| **SPTF** | {sum((-w) * obj for w, obj in zip(WEIGHTS, toolbox.evaluate_val((SPTF, 0))))} |\n'
+    )
+    with writer.as_default():
+        tf.summary.text('Compare', table_results, step=0)
     print('Done')
 
     writer.close()
