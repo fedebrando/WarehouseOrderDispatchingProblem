@@ -1,7 +1,8 @@
 
 from warehouse import Warehouse
 from order_manager import OrderManager
-from policies import *
+from classical_policies import *
+from gp_policy import get_gp_policy
 from initial_state import InitialState
 
 def main():

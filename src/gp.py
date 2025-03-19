@@ -7,52 +7,26 @@ import os
 from typing import Callable
 from deap import base, creator, tools, gp
 import tensorflow as tf
+import time
+import datetime
 
 from utilities import path_length
 from reading_data import read_data
 from dynamic_order import DynamicOrder
 from initial_state import InitialState
 from evolution import evolution
+from classical_policies import *
 
-from utilities import d
-
-def RR(o: DynamicOrder, Z: np.array, C: np.array, V: np.array, O: list[list[int]]) -> int:
-    '''
-    Round Robin
-    '''
-    if not hasattr(RR, 'valore'):
-        RR.valore = -1
-    RR.valore = (RR.valore + 1) % len(C)
-    i = RR.valore
-    while (i + 1) % len(O) != RR.valore:
-        if not O[i]:
-            break
-        i = (i + 1) % len(O)
-    return i
-
-def NAF(o: DynamicOrder, Z: np.array, C: np.array, V: np.array, O: list[list[int]]) -> int:
-    '''
-    Nearest AGV First
-    '''
-    pick = o.get_pick()
-    pick_pos = Z[pick]
-    idx_freeC = filter(lambda i_pos : not bool(O[i_pos[0]]), enumerate(C))
-    idx_freeC = sorted(idx_freeC, key=lambda i_pos : d(i_pos[1], pick_pos))
-    return idx_freeC[0][0]
-
-def SPTF(o: DynamicOrder, Z: np.array, C: np.array, V: np.array, O: list[list[int]]) -> int:
-    '''
-    Shortest Processing Time First
-    '''
-    pick, drop = o.get_pick(), o.get_drop()
-    d_pick_drop = d(Z[pick], Z[drop])
-    idx_freeC = filter(lambda i_pos : not bool(O[i_pos[0]]), enumerate(C))
-    idx_freeC = sorted(idx_freeC, key=lambda i_pos : (d(i_pos[1], Z[pick]) + d_pick_drop) / V[i_pos[0]])
-    return idx_freeC[0][0]
-
-RUN_NAME = 'attempt03'
+RUN_NAME = 'attempt00'
 SEED = 123
-WEIGHTS = (-1.0, -1.0, -1.0, -1.0)
+
+OBJECTIVES = {
+    'time': -1.0,
+    'distance': 0,
+    'consumption': 0,
+    'size_penalty': 0
+}
+
 VALIDATE_EVERY = 10
 
 N_GEN = 2
@@ -69,6 +43,12 @@ SUBTREE_MAX_HEIGHT_MUT = 2
 
 INIT_MIN_HEIGHT = 1
 INIT_MAX_HEIGHT = 5
+
+WEIGHTS = []
+for w in OBJECTIVES.values():
+    if w:
+        WEIGHTS.append(w)
+WEIGHTS = tuple(WEIGHTS)
 
 def get_pset() -> gp.PrimitiveSet:
     '''
@@ -150,9 +130,23 @@ def get_mstats() -> tools.MultiStatistics:
     '''
     Returns statistic settings
     '''
-    stats_weighted = tools.Statistics(lambda ind: sum((-w) * obj for w, obj in zip(WEIGHTS, ind.fitness.values)))
-    stats_size = tools.Statistics(len)
-    mstats = tools.MultiStatistics(fitness=stats_weighted, size=stats_size)
+    mstats_dict = {
+        'fitness': tools.Statistics(lambda ind: sum((-w) * obj for w, obj in zip(WEIGHTS, ind.fitness.values))),
+    }
+    i = 0
+    if OBJECTIVES['time']:
+        mstats_dict['fit_time'] = tools.Statistics(lambda ind: ind.fitness.values[i])
+        i += 1
+    if OBJECTIVES['distance']:
+        mstats_dict['fit_distance'] = tools.Statistics(lambda ind: ind.fitness.values[i])
+        i += 1
+    if OBJECTIVES['consumption']:
+        mstats_dict['fit_consumption'] = tools.Statistics(lambda ind: ind.fitness.values[i])
+    if OBJECTIVES['size_penalty']:
+        mstats_dict['size'] = tools.Statistics(len)
+
+    mstats = tools.MultiStatistics(**mstats_dict)
+
     mstats.register('avg', np.mean)
     mstats.register('std', np.std)
     mstats.register('min', np.min)
@@ -278,7 +272,17 @@ def fitness(individual: gp.PrimitiveTree | tuple[Callable[[DynamicOrder, np.arra
                         else:
                             C_t_last_update[i] = t_curr
 
-    return sum_waiting_time / len(orders), sum_distance / len(orders), sum_consumption / len(orders), len_individual
+    fitness_values = []
+    if OBJECTIVES['time']:
+        fitness_values.append(sum_waiting_time / len(orders))
+    if OBJECTIVES['distance']:
+        fitness_values.append(sum_distance / len(orders))
+    if OBJECTIVES['consumption']:
+        fitness_values.append(sum_consumption / len(orders))
+    if OBJECTIVES['size_penalty']:
+        fitness_values.append(len_individual)
+
+    return tuple(fitness_values)
 
 def main():
     # Primitive set
@@ -307,7 +311,7 @@ def main():
         '| Setting | Value |\n'
         '|---------|-------|\n'
         f'| **Seed** | {SEED} |\n'
-        f'| **Objective weights** | {WEIGHTS} |\n'
+        f'| **Objectives** | {'<br>'.join([f'{'🟢' if w else '🔴'} {obj} {f'({w})' if w else ''}' for obj, w in OBJECTIVES.items()])} |\n'
         f'| **Validate every** | {VALIDATE_EVERY} generation{'' if VALIDATE_EVERY == 1 else 's'} |\n'
         f'| **Generations** | {N_GEN} |\n'
         f'| **Population size** | {POP_SIZE} |\n'
@@ -332,6 +336,7 @@ def main():
     logbook.header = mstats.fields
 
     print('-- Start of evolution --')
+    start_time = time.time()
     pop, best_ind_on_val, best_val_eval = evolution(
         weights=WEIGHTS,
         population=pop,
@@ -347,23 +352,26 @@ def main():
         max_non_imp=MAX_NON_IMP,
         verbose=True,
     )
+    end_time = time.time()
     print('-- End of evolution --')
+    print('Evolution time:', str(datetime.timedelta(seconds=(end_time - start_time))))
 
     # Stores results on tensorboard
-    print('Store results on tensorboard')
+    print('Storing results on tensorboard...')
     table_results = (
         '| Name | Value |\n'
         '|---------|-------|\n'
         f'| **Best individual** | {best_ind_on_val} |\n'
         f'| **Best fitness** | {sum((-w) * obj for w, obj in zip(WEIGHTS, best_ind_on_val.fitness.values))} |\n'
         f'| **Validation score** | {best_val_eval} |\n'
+        f'| **Evolution time** | {str(datetime.timedelta(seconds=(end_time - start_time)))} |\n'
     )
     with writer.as_default():
         tf.summary.text('Results', table_results, step=0)
     print('Done')
 
     # Stores comparisons on tensorboard
-    print('Store comparisons on tensorboard')
+    print('Storing comparisons on tensorboard...')
     table_results = (
         '| Policy | Validation score |\n'
         '|---------|-------|\n'

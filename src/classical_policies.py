@@ -1,16 +1,8 @@
 
-from typing import Callable
 import numpy as np
 
 from dynamic_order import DynamicOrder
 from utilities import d
-from gp import decoding
-
-def get_gp_policy(individual) -> Callable[[DynamicOrder, np.array, np.array, np.array, list[list[int]]], int]:
-    '''
-    Returns policy callable function decoded from the received individual
-    '''
-    return decoding(individual, simulation=True)
 
 def RR(o: DynamicOrder, Z: np.array, C: np.array, V: np.array, O: list[list[int]]) -> int:
     '''
