@@ -18,7 +18,7 @@ from initial_state import InitialState
 from evolution import evolution
 from classical_policies import *
 
-RUN_NAME = 'attempt00'
+RUN_NAME = 'attempt01'
 SEED = 123
 
 OBJECTIVES = {

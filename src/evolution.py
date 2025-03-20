@@ -49,7 +49,7 @@ def evolution(
 
         # add validation score on tensorboard
         with writer.as_default():
-            tf.summary.scalar("Validation Score (on best-so-far training individual)", best_val_eval, step=elapsed_gens)
+            tf.summary.scalar("validation_score (on best-so-far training individual)", best_val_eval, step=elapsed_gens)
 
     return pop, best_ind_on_val, best_val_eval
     
@@ -123,7 +123,8 @@ def eaSimple(
 
         # write stats on tensorboard
         with writer.as_default():
-            tf.summary.scalar('Training Fitness/Avg', record['fitness']['avg'], step=gen)
-            tf.summary.scalar('Training Fitness/Min', record['fitness']['min'], step=gen)
+            for key in record:
+                tf.summary.scalar(f'{key}/avg', record[key]['avg'], step=gen)
+                tf.summary.scalar(f'{key}/min', record[key]['min'], step=gen)
 
     return population
