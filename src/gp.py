@@ -9,6 +9,7 @@ from deap import base, creator, tools, gp
 import tensorflow as tf
 import time
 import datetime
+from functools import partial
 
 from utilities import path_length
 from reading_data import read_data
@@ -135,13 +136,13 @@ def get_mstats() -> tools.MultiStatistics:
     }
     i = 0
     if OBJECTIVES['time']:
-        mstats_dict['fit_time'] = tools.Statistics(lambda ind: ind.fitness.values[i])
+        mstats_dict['fit_time'] = tools.Statistics(partial(lambda ind, i: ind.fitness.values[i], i=i))
         i += 1
     if OBJECTIVES['distance']:
-        mstats_dict['fit_distance'] = tools.Statistics(lambda ind: ind.fitness.values[i])
+        mstats_dict['fit_distance'] = tools.Statistics(partial(lambda ind, i: ind.fitness.values[i], i=i))
         i += 1
     if OBJECTIVES['consumption']:
-        mstats_dict['fit_consumption'] = tools.Statistics(lambda ind: ind.fitness.values[i])
+        mstats_dict['fit_consumption'] = tools.Statistics(partial(lambda ind, i: ind.fitness.values[i], i=i))
     if OBJECTIVES['size_penalty']:
         mstats_dict['size'] = tools.Statistics(len)
 
