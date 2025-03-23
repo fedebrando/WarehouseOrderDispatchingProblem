@@ -18,8 +18,8 @@ from initial_state import InitialState
 from evolution import evolution
 from classical_policies import *
 
-RUN_NAME = 'attempt01'
-SEED = 123
+RUN_NAME = 'attempt02'
+SEED = 572
 
 OBJECTIVES = {
     'time': -1.0,
@@ -28,22 +28,22 @@ OBJECTIVES = {
     'size_penalty': 0
 }
 
-VALIDATE_EVERY = 10
+VALIDATE_EVERY = 5
 
 N_GEN = 2
 POP_SIZE = 5
-MAX_NON_IMP = 10
+MAX_NON_IMP = 5
 
-P_CROSSOVER = 0.5
-LIMIT_HEIGHT_CROSSOVER = 17
+P_CROSSOVER = 0.7
+LIMIT_HEIGHT_CROSSOVER = 20
 
-P_MUTATION = 0.1
-LIMIT_HEIGHT_MUTATION = 17
+P_MUTATION = 0.05
+LIMIT_HEIGHT_MUTATION = 20
 SUBTREE_MIN_HEIGHT_MUT = 0
 SUBTREE_MAX_HEIGHT_MUT = 2
 
-INIT_MIN_HEIGHT = 1
-INIT_MAX_HEIGHT = 5
+INIT_MIN_HEIGHT = 5
+INIT_MAX_HEIGHT = 15
 
 WEIGHTS = []
 for w in OBJECTIVES.values():
@@ -216,6 +216,7 @@ def fitness(individual: gp.PrimitiveTree | tuple[Callable[[DynamicOrder, np.arra
         t_curr = max(t_arr, t_curr)
 
         # apply policy
+        #print(len(O) - sum(map(bool, O)))
         idx_best_available = policy(order, Z, C, V, O)
         O[idx_best_available] += [idx_z_pick, idx_z_drop]
 

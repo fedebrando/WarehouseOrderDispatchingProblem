@@ -43,7 +43,7 @@ class OrderManager:
         Reads the orders from a CSV file and returns a list of DynamicOrder objects
         '''
         orders = []
-        with open(os.path.join('..', 'data', 'orders.csv'), mode='r', newline='') as file:
+        with open(os.path.join('..', 'data', 'orders_test.csv'), mode='r', newline='') as file:
             reader = csv.reader(file)
             next(reader)  # Skip header row
             for row in reader:
