@@ -18,7 +18,7 @@ def evolution(
         validate_every: int,
         max_non_imp: int,
         verbose: bool = __debug__,
-    ) -> tuple[list[gp.PrimitiveTree], gp.PrimitiveTree]:
+    ) -> tuple[list[gp.PrimitiveTree], gp.PrimitiveTree, tuple[float]]:
     '''
     Training and Validation with early stopping
     '''
@@ -51,7 +51,7 @@ def evolution(
         with writer.as_default():
             tf.summary.scalar("validation_score (on best-so-far training individual)", best_val_eval, step=elapsed_gens)
 
-    return pop, best_ind_on_val, best_val_eval
+    return pop, best_ind_on_val, obj_values
     
 def eaSimple(
         population: list[gp.PrimitiveTree],

@@ -18,20 +18,20 @@ from initial_state import InitialState
 from evolution import evolution
 from classical_policies import *
 
-RUN_NAME = 'attempt02'
-SEED = 572
+RUN_NAME = 'attempt003'
+SEED = 1738294512
 
 OBJECTIVES = {
-    'time': -1.0,
+    'time': 0,
     'distance': 0,
-    'consumption': 0,
+    'consumption': -1.0,
     'size_penalty': 0
 }
 
 VALIDATE_EVERY = 5
 
-N_GEN = 2
-POP_SIZE = 5
+N_GEN = 200
+POP_SIZE = 1000
 MAX_NON_IMP = 5
 
 P_CROSSOVER = 0.7
@@ -132,7 +132,7 @@ def get_mstats() -> tools.MultiStatistics:
     Returns statistic settings
     '''
     mstats_dict = {
-        'fitness': tools.Statistics(lambda ind: sum((-w) * obj for w, obj in zip(WEIGHTS, ind.fitness.values))),
+        'fitness': tools.Statistics(lambda ind: tuple_to_fitness(ind.fitness.values)),
     }
     i = 0
     if OBJECTIVES['time']:
@@ -286,6 +286,12 @@ def fitness(individual: gp.PrimitiveTree | tuple[Callable[[DynamicOrder, np.arra
 
     return tuple(fitness_values)
 
+def tuple_to_fitness(obj_values: tuple[float]) -> float:
+    '''
+    Returns fitness from single objective values tuple through the weighted sum
+    '''
+    return sum((-w) * obj for w, obj in zip(WEIGHTS, obj_values))
+
 def main():
     # Primitive set
     pset = get_pset()
@@ -339,7 +345,7 @@ def main():
 
     print('-- Start of evolution --')
     start_time = time.time()
-    pop, best_ind_on_val, best_val_eval = evolution(
+    pop, best_ind_on_val, obj_val_values = evolution(
         weights=WEIGHTS,
         population=pop,
         toolbox=toolbox,
@@ -360,11 +366,12 @@ def main():
 
     # Stores results on tensorboard
     print('Storing results on tensorboard...')
+    best_val_eval = tuple_to_fitness(obj_val_values)
     table_results = (
         '| Name | Value |\n'
         '|---------|-------|\n'
         f'| **Best individual** | {best_ind_on_val} |\n'
-        f'| **Best fitness** | {sum((-w) * obj for w, obj in zip(WEIGHTS, best_ind_on_val.fitness.values))} |\n'
+        f'| **Best fitness** | {tuple_to_fitness(best_ind_on_val.fitness.values)} |\n'
         f'| **Validation score** | {best_val_eval} |\n'
         f'| **Evolution time** | {str(datetime.timedelta(seconds=(end_time - start_time)))} |\n'
     )
@@ -374,13 +381,20 @@ def main():
 
     # Stores comparisons on tensorboard
     print('Storing comparisons on tensorboard...')
+    active_obj_strs = [obj_str for obj_str, w in OBJECTIVES.items() if w]
+    policy_evaluation = {
+        'GP': obj_val_values,
+        'RR': toolbox.evaluate_val((RR, 0)),
+        'NAF': toolbox.evaluate_val((NAF, 0)),
+        'SPTF': toolbox.evaluate_val((SPTF, 0))
+    }
     table_results = (
-        '| Policy | Validation score |\n'
-        '|---------|-------|\n'
-        f'| **GP** | {best_val_eval} |\n'
-        f'| **RR** | {sum((-w) * obj for w, obj in zip(WEIGHTS, toolbox.evaluate_val((RR, 0))))} |\n'
-        f'| **NAF** | {sum((-w) * obj for w, obj in zip(WEIGHTS, toolbox.evaluate_val((NAF, 0))))} |\n'
-        f'| **SPTF** | {sum((-w) * obj for w, obj in zip(WEIGHTS, toolbox.evaluate_val((SPTF, 0))))} |\n'
+        f'| Policy | Validation score (fitness) | {'|'.join([f'Validation score ({obj_str})' for obj_str in active_obj_strs])} |\n'
+        '|---------|-------|' + ('-------|' * len(active_obj_strs)) + '\n'
+        f'| **GP** | {best_val_eval} | {'|'.join(map(str, policy_evaluation['GP']))} |\n'
+        f'| **RR** | {tuple_to_fitness(policy_evaluation['RR'])} | {'|'.join(map(str, policy_evaluation['RR']))} |\n'
+        f'| **NAF** | {tuple_to_fitness(policy_evaluation['NAF'])} | {'|'.join(map(str, policy_evaluation['NAF']))} |\n'
+        f'| **SPTF** | {tuple_to_fitness(policy_evaluation['SPTF'])} | {'|'.join(map(str, policy_evaluation['SPTF']))} |\n'
     )
     with writer.as_default():
         tf.summary.text('Compare', table_results, step=0)
