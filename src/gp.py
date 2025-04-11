@@ -11,27 +11,32 @@ import time
 import datetime
 from functools import partial
 
-from utilities import path_length
+from utilities import path_length, weighted_sum
 from reading_data import read_data
 from dynamic_order import DynamicOrder
 from initial_state import InitialState
-from evolution import evolution
+from evolution import evolution, pareto_or_global_evaluation
 from classical_policies import *
+from meta_primitive_tree import MetaPrimitiveTree
 
-RUN_NAME = 'attempt003'
-SEED = 1738294512
+RUN_NAME = 'attempt000J'
+SEED = 5296136267
+# 1704238723
+
+USE_PARETO = True
+#PARETO_FRONT_FOR_HEAD = 10
 
 OBJECTIVES = {
     'time': 0,
-    'distance': 0,
-    'consumption': -1.0,
+    'distance': -1.0,
+    'consumption': -100.0,
     'size_penalty': 0
 }
 
 VALIDATE_EVERY = 5
 
-N_GEN = 200
-POP_SIZE = 1000
+N_GEN = 10
+POP_SIZE = 5
 MAX_NON_IMP = 5
 
 P_CROSSOVER = 0.7
@@ -94,10 +99,10 @@ def get_toolbox(pset: gp.PrimitiveSet, simulation: bool = False) -> base.Toolbox
     '''
     if not hasattr(get_toolbox, 'toolbox'):
         # Set fitness function
-        creator.create('FitnessMin', base.Fitness, weights=WEIGHTS)
+        creator.create('FitnessMin', base.Fitness, weights=(WEIGHTS if USE_PARETO else (-1.0,)))
 
         # Set individual as tree
-        creator.create('Individual', gp.PrimitiveTree, fitness=creator.FitnessMin)
+        creator.create('Individual', MetaPrimitiveTree, fitness=creator.FitnessMin)
 
         # Register expression making, individual making and pop initialization
         get_toolbox.toolbox = base.Toolbox()
@@ -131,18 +136,20 @@ def get_mstats() -> tools.MultiStatistics:
     '''
     Returns statistic settings
     '''
-    mstats_dict = {
-        'fitness': tools.Statistics(lambda ind: tuple_to_fitness(ind.fitness.values)),
-    }
+    mstats_dict = {}
+
+    if not USE_PARETO:
+        mstats_dict['fitness'] = tools.Statistics(lambda ind: -weighted_sum(ind.fitness.values, WEIGHTS))
+
     i = 0
     if OBJECTIVES['time']:
-        mstats_dict['fit_time'] = tools.Statistics(partial(lambda ind, i: ind.fitness.values[i], i=i))
+        mstats_dict['fit_time'] = tools.Statistics(partial(lambda ind, i: ind.metadata['obj_values'][i], i=i))
         i += 1
     if OBJECTIVES['distance']:
-        mstats_dict['fit_distance'] = tools.Statistics(partial(lambda ind, i: ind.fitness.values[i], i=i))
+        mstats_dict['fit_distance'] = tools.Statistics(partial(lambda ind, i: ind.metadata['obj_values'][i], i=i))
         i += 1
     if OBJECTIVES['consumption']:
-        mstats_dict['fit_consumption'] = tools.Statistics(partial(lambda ind, i: ind.fitness.values[i], i=i))
+        mstats_dict['fit_consumption'] = tools.Statistics(partial(lambda ind, i: ind.metadata['obj_values'][i], i=i))
     if OBJECTIVES['size_penalty']:
         mstats_dict['size'] = tools.Statistics(len)
 
@@ -155,7 +162,7 @@ def get_mstats() -> tools.MultiStatistics:
 
     return mstats
 
-def decoding(individual: gp.PrimitiveTree, simulation: bool = False) -> Callable[[DynamicOrder, np.array, np.array, np.array, list[list[int]]], int]:
+def decoding(individual: MetaPrimitiveTree, simulation: bool = False) -> Callable[[DynamicOrder, np.array, np.array, np.array, list[list[int]]], int]:
     '''
     Returns callable function corresponding to the received individual
     '''
@@ -187,11 +194,11 @@ def decoding(individual: gp.PrimitiveTree, simulation: bool = False) -> Callable
     
     return policy
 
-def fitness(individual: gp.PrimitiveTree | tuple[Callable[[DynamicOrder, np.array, np.array, np.array, list[list[int]]], int], int], orders: list[DynamicOrder]):
+def fitness(individual: MetaPrimitiveTree | tuple[Callable[[DynamicOrder, np.array, np.array, np.array, list[list[int]]], int], int], orders: list[DynamicOrder]):
     '''
     Fitness function
     '''
-    if isinstance(individual, gp.PrimitiveTree):
+    if isinstance(individual, MetaPrimitiveTree):
         policy = decoding(individual)
         len_individual = len(individual)
     else:
@@ -284,13 +291,7 @@ def fitness(individual: gp.PrimitiveTree | tuple[Callable[[DynamicOrder, np.arra
     if OBJECTIVES['size_penalty']:
         fitness_values.append(len_individual)
 
-    return tuple(fitness_values)
-
-def tuple_to_fitness(obj_values: tuple[float]) -> float:
-    '''
-    Returns fitness from single objective values tuple through the weighted sum
-    '''
-    return sum((-w) * obj for w, obj in zip(WEIGHTS, obj_values))
+    return tuple(fitness_values) #if USE_PARETO else (-weighted_sum(fitness_values, WEIGHTS),)
 
 def main():
     # Primitive set
@@ -320,6 +321,7 @@ def main():
         '|---------|-------|\n'
         f'| **Seed** | {SEED} |\n'
         f'| **Objectives** | {'<br>'.join([f'{'🟢' if w else '🔴'} {obj} {f'({w})' if w else ''}' for obj, w in OBJECTIVES.items()])} |\n'
+        f'| **Pareto domain** | {'🟢 yes' if USE_PARETO else '🔴 no'}'
         f'| **Validate every** | {VALIDATE_EVERY} generation{'' if VALIDATE_EVERY == 1 else 's'} |\n'
         f'| **Generations** | {N_GEN} |\n'
         f'| **Population size** | {POP_SIZE} |\n'
@@ -345,8 +347,9 @@ def main():
 
     print('-- Start of evolution --')
     start_time = time.time()
-    pop, best_ind_on_val, obj_val_values = evolution(
+    pop, best_ind_on_val, validation_score = evolution(
         weights=WEIGHTS,
+        use_pareto=USE_PARETO,
         population=pop,
         toolbox=toolbox,
         cxpb=P_CROSSOVER,
@@ -366,13 +369,12 @@ def main():
 
     # Stores results on tensorboard
     print('Storing results on tensorboard...')
-    best_val_eval = tuple_to_fitness(obj_val_values)
     table_results = (
         '| Name | Value |\n'
         '|---------|-------|\n'
         f'| **Best individual** | {best_ind_on_val} |\n'
-        f'| **Best fitness** | {tuple_to_fitness(best_ind_on_val.fitness.values)} |\n'
-        f'| **Validation score** | {best_val_eval} |\n'
+        f'| **Best fitness** | {best_ind_on_val.fitness.values} |\n'
+        f'| **Validation score** | {validation_score} |\n'
         f'| **Evolution time** | {str(datetime.timedelta(seconds=(end_time - start_time)))} |\n'
     )
     with writer.as_default():
@@ -383,18 +385,18 @@ def main():
     print('Storing comparisons on tensorboard...')
     active_obj_strs = [obj_str for obj_str, w in OBJECTIVES.items() if w]
     policy_evaluation = {
-        'GP': obj_val_values,
-        'RR': toolbox.evaluate_val((RR, 0)),
-        'NAF': toolbox.evaluate_val((NAF, 0)),
-        'SPTF': toolbox.evaluate_val((SPTF, 0))
+        'GP': best_ind_on_val.metadata['validation_obj_values'],
+        'RR': toolbox.evaluate_val((RR, 1)),
+        'NAF': toolbox.evaluate_val((NAF, 63)),
+        'SPTF': toolbox.evaluate_val((SPTF, 141))
     }
     table_results = (
         f'| Policy | Validation score (fitness) | {'|'.join([f'Validation score ({obj_str})' for obj_str in active_obj_strs])} |\n'
         '|---------|-------|' + ('-------|' * len(active_obj_strs)) + '\n'
-        f'| **GP** | {best_val_eval} | {'|'.join(map(str, policy_evaluation['GP']))} |\n'
-        f'| **RR** | {tuple_to_fitness(policy_evaluation['RR'])} | {'|'.join(map(str, policy_evaluation['RR']))} |\n'
-        f'| **NAF** | {tuple_to_fitness(policy_evaluation['NAF'])} | {'|'.join(map(str, policy_evaluation['NAF']))} |\n'
-        f'| **SPTF** | {tuple_to_fitness(policy_evaluation['SPTF'])} | {'|'.join(map(str, policy_evaluation['SPTF']))} |\n'
+        f'| **GP** | {validation_score} | {'|'.join(map(str, policy_evaluation['GP']))} |\n'
+        f'| **RR** | {pareto_or_global_evaluation(USE_PARETO, policy_evaluation['RR'], WEIGHTS)} | {'|'.join(map(str, policy_evaluation['RR']))} |\n'
+        f'| **NAF** | {pareto_or_global_evaluation(USE_PARETO, policy_evaluation['NAF'], WEIGHTS)} | {'|'.join(map(str, policy_evaluation['NAF']))} |\n'
+        f'| **SPTF** | {pareto_or_global_evaluation(USE_PARETO, policy_evaluation['SPTF'], WEIGHTS)} | {'|'.join(map(str, policy_evaluation['SPTF']))} |\n'
     )
     with writer.as_default():
         tf.summary.text('Compare', table_results, step=0)
