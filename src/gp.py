@@ -11,6 +11,7 @@ import time
 import datetime
 from functools import partial
 
+from gp_hyperparams import *
 from utilities import path_length, weighted_sum
 from reading_data import read_data
 from dynamic_order import DynamicOrder
@@ -18,39 +19,6 @@ from initial_state import InitialState
 from evolution import evolution, pareto_or_global_evaluation
 from classical_policies import *
 from meta_primitive_tree import MetaPrimitiveTree
-
-RUN_NAME = 'attempt000AH'
-SEED = 86456
-# 5296136267
-# 1704238723
-
-USE_PARETO = False
-
-OBJECTIVES = {
-    'time': 0,
-    'distance': -1.0,
-    'consumption': -1.0,
-    'size_penalty': 0
-}
-
-VALIDATE_EVERY = 5
-
-N_GEN = 15
-POP_SIZE = 10
-MAX_NON_IMP = 5
-
-P_CROSSOVER = 0.7
-LIMIT_HEIGHT_CROSSOVER = 20
-
-P_MUTATION = 0.05
-LIMIT_HEIGHT_MUTATION = 20
-SUBTREE_MIN_HEIGHT_MUT = 0
-SUBTREE_MAX_HEIGHT_MUT = 2
-
-INIT_MIN_HEIGHT = 5
-INIT_MAX_HEIGHT = 15
-
-# Computed constants
 
 WEIGHTS = []
 for w in OBJECTIVES.values():

@@ -115,8 +115,6 @@ def eaSimple(
     # Begin the generational process
     gen_range = range(1, ngen + 1) if genstart == 0 else range(genstart, genstart + ngen)
     for gen in gen_range:
-        worst_ind = min(population, key=lambda ind: ind.fitness)
-        print('WORST:', worst_ind.fitness.values)
         # Select the next generation individuals
         offspring = toolbox.select(population, len(population))
 
@@ -132,7 +130,6 @@ def eaSimple(
 
         # Update the hall of fame with the generated individuals
         halloffame.update(invalid_ind)
-        print('HOF:', [ind.fitness.values for ind in halloffame])
 
         # Replace the current population by the offspring
         population[:] = offspring
@@ -141,9 +138,7 @@ def eaSimple(
         best_inds_deleted = [ind for ind in halloffame if ind not in population]
         for best_ind in best_inds_deleted:
             worst_ind = min(population, key=lambda ind: ind.fitness)
-            print('WORST:', worst_ind.fitness.values)
-            population[population.index(min(population, key=lambda ind: ind.fitness))] = best_ind
-            assert(best_ind in population)
+            population[population.index(worst_ind)] = best_ind
 
         # Append the current generation statistics to the logbook
         record = stats.compile(population) if stats else {}
