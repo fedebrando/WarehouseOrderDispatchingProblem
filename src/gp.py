@@ -19,24 +19,24 @@ from evolution import evolution, pareto_or_global_evaluation
 from classical_policies import *
 from meta_primitive_tree import MetaPrimitiveTree
 
-RUN_NAME = 'attempt000J'
-SEED = 5296136267
+RUN_NAME = 'attempt000AH'
+SEED = 86456
+# 5296136267
 # 1704238723
 
-USE_PARETO = True
-#PARETO_FRONT_FOR_HEAD = 10
+USE_PARETO = False
 
 OBJECTIVES = {
     'time': 0,
     'distance': -1.0,
-    'consumption': -100.0,
+    'consumption': -1.0,
     'size_penalty': 0
 }
 
 VALIDATE_EVERY = 5
 
-N_GEN = 10
-POP_SIZE = 5
+N_GEN = 15
+POP_SIZE = 10
 MAX_NON_IMP = 5
 
 P_CROSSOVER = 0.7
@@ -49,6 +49,8 @@ SUBTREE_MAX_HEIGHT_MUT = 2
 
 INIT_MIN_HEIGHT = 5
 INIT_MAX_HEIGHT = 15
+
+# Computed constants
 
 WEIGHTS = []
 for w in OBJECTIVES.values():
@@ -194,7 +196,7 @@ def decoding(individual: MetaPrimitiveTree, simulation: bool = False) -> Callabl
     
     return policy
 
-def fitness(individual: MetaPrimitiveTree | tuple[Callable[[DynamicOrder, np.array, np.array, np.array, list[list[int]]], int], int], orders: list[DynamicOrder]):
+def fitness(individual: MetaPrimitiveTree | tuple[Callable[[DynamicOrder, np.array, np.array, np.array, list[list[int]]], int], int], orders: list[DynamicOrder]) -> tuple[float]:
     '''
     Fitness function
     '''
@@ -291,7 +293,7 @@ def fitness(individual: MetaPrimitiveTree | tuple[Callable[[DynamicOrder, np.arr
     if OBJECTIVES['size_penalty']:
         fitness_values.append(len_individual)
 
-    return tuple(fitness_values) #if USE_PARETO else (-weighted_sum(fitness_values, WEIGHTS),)
+    return tuple(fitness_values)
 
 def main():
     # Primitive set
@@ -305,7 +307,7 @@ def main():
     
     # Initialize population and Hall of Fame
     pop = toolbox.population(n=POP_SIZE)
-    hof = tools.HallOfFame(1)
+    hof = tools.ParetoFront() if USE_PARETO else tools.HallOfFame(1)
     
     # Define statistics tracking
     mstats = get_mstats()
@@ -321,7 +323,7 @@ def main():
         '|---------|-------|\n'
         f'| **Seed** | {SEED} |\n'
         f'| **Objectives** | {'<br>'.join([f'{'🟢' if w else '🔴'} {obj} {f'({w})' if w else ''}' for obj, w in OBJECTIVES.items()])} |\n'
-        f'| **Pareto domain** | {'🟢 yes' if USE_PARETO else '🔴 no'}'
+        f'| **Pareto front** | {f'🟢 yes' if USE_PARETO else '🔴 no'}'
         f'| **Validate every** | {VALIDATE_EVERY} generation{'' if VALIDATE_EVERY == 1 else 's'} |\n'
         f'| **Generations** | {N_GEN} |\n'
         f'| **Population size** | {POP_SIZE} |\n'
@@ -347,8 +349,9 @@ def main():
 
     print('-- Start of evolution --')
     start_time = time.time()
-    pop, best_ind_on_val, validation_score = evolution(
+    pop, val_hof = evolution(
         weights=WEIGHTS,
+        fitness_creator=creator.FitnessMin,
         use_pareto=USE_PARETO,
         population=pop,
         toolbox=toolbox,
@@ -361,7 +364,7 @@ def main():
         writer=writer,
         validate_every=VALIDATE_EVERY,
         max_non_imp=MAX_NON_IMP,
-        verbose=True,
+        verbose=True
     )
     end_time = time.time()
     print('-- End of evolution --')
@@ -369,31 +372,43 @@ def main():
 
     # Stores results on tensorboard
     print('Storing results on tensorboard...')
-    table_results = (
+
+    # Best individuals on validation (selected from best ones on training)
+    for i, best_ind in enumerate(val_hof):
+        table_results = (
+            '| Name | Value |\n'
+            '|---------|-------|\n'
+            f'| **Best individual** | {best_ind} |\n'
+            f'| **Fitness** | {best_ind.fitness.values} |\n'
+            f'| **Validation score** | {best_ind.metadata['validation_score']} |\n'
+        )
+        with writer.as_default():
+            tf.summary.text('Results', table_results, step=i)
+            
+    table_time = (
         '| Name | Value |\n'
         '|---------|-------|\n'
-        f'| **Best individual** | {best_ind_on_val} |\n'
-        f'| **Best fitness** | {best_ind_on_val.fitness.values} |\n'
-        f'| **Validation score** | {validation_score} |\n'
         f'| **Evolution time** | {str(datetime.timedelta(seconds=(end_time - start_time)))} |\n'
     )
     with writer.as_default():
-        tf.summary.text('Results', table_results, step=0)
+        tf.summary.text('Time', table_time, step=i)
+
     print('Done')
 
     # Stores comparisons on tensorboard
     print('Storing comparisons on tensorboard...')
     active_obj_strs = [obj_str for obj_str, w in OBJECTIVES.items() if w]
     policy_evaluation = {
-        'GP': best_ind_on_val.metadata['validation_obj_values'],
         'RR': toolbox.evaluate_val((RR, 1)),
         'NAF': toolbox.evaluate_val((NAF, 63)),
         'SPTF': toolbox.evaluate_val((SPTF, 141))
     }
+
+    gp_records = '\n'.join([f'| **GP{f'[{i}]' if USE_PARETO else ''}** | {best_ind_on_val.metadata['validation_score']} | {'|'.join(map(str, best_ind_on_val.metadata['validation_obj_values']))} |' for i, best_ind_on_val in enumerate(val_hof)])
     table_results = (
-        f'| Policy | Validation score (fitness) | {'|'.join([f'Validation score ({obj_str})' for obj_str in active_obj_strs])} |\n'
+        f'| Policy | Validation score | {'|'.join([f'Validation score ({obj_str})' for obj_str in active_obj_strs])} |\n'
         '|---------|-------|' + ('-------|' * len(active_obj_strs)) + '\n'
-        f'| **GP** | {validation_score} | {'|'.join(map(str, policy_evaluation['GP']))} |\n'
+        f'{gp_records}' + '\n'
         f'| **RR** | {pareto_or_global_evaluation(USE_PARETO, policy_evaluation['RR'], WEIGHTS)} | {'|'.join(map(str, policy_evaluation['RR']))} |\n'
         f'| **NAF** | {pareto_or_global_evaluation(USE_PARETO, policy_evaluation['NAF'], WEIGHTS)} | {'|'.join(map(str, policy_evaluation['NAF']))} |\n'
         f'| **SPTF** | {pareto_or_global_evaluation(USE_PARETO, policy_evaluation['SPTF'], WEIGHTS)} | {'|'.join(map(str, policy_evaluation['SPTF']))} |\n'
