@@ -109,7 +109,7 @@ def get_mstats() -> tools.MultiStatistics:
     mstats_dict = {}
 
     if not USE_PARETO:
-        mstats_dict['fitness'] = tools.Statistics(lambda ind: -weighted_sum(ind.fitness.values, WEIGHTS))
+        mstats_dict['fitness'] = tools.Statistics(lambda ind: ind.fitness.values[0])
 
     i = 0
     if OBJECTIVES['time']:
