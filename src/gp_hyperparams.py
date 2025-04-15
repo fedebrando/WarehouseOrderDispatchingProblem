@@ -1,20 +1,20 @@
 
-RUN_NAME = 'attempt000AH'
-SEED = 86456 # 5296136267 # 1704238723
+RUN_NAME = 'attempt003'
+SEED = 5839201746
 
 USE_PARETO = False
 OBJECTIVES = {
     'time': 0,
-    'distance': -1.0,
-    'consumption': -1.0,
-    'size_penalty': 0
+    'distance': 0,
+    'consumption': -0.01,
+    'size_penalty': -0.0001
 }
 
 VALIDATE_EVERY = 5
 MAX_NON_IMP = 5
 
-N_GEN = 15
-POP_SIZE = 10
+N_GEN = 200
+POP_SIZE = 1000
 
 P_CROSSOVER = 0.7
 LIMIT_HEIGHT_CROSSOVER = 20
