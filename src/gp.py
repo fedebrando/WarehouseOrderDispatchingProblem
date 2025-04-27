@@ -12,7 +12,7 @@ import datetime
 from functools import partial
 
 from gp_hyperparams import *
-from utilities import path_length, weighted_sum
+from utilities import path_length
 from reading_data import read_data
 from dynamic_order import DynamicOrder
 from initial_state import InitialState
@@ -186,30 +186,18 @@ def fitness(individual: MetaPrimitiveTree | tuple[Callable[[DynamicOrder, np.arr
     P = InitialState.P
     O = [[] for _ in range(len(C))]
     
-    for order in orders:
+    for order in enumerate(orders):
         t_arr, idx_z_pick, idx_z_drop = order.get_t_arr(), order.get_pick(), order.get_drop()
 
-        # now
+        # Now
         t_curr = max(t_arr, t_curr)
 
-        # apply policy
-        #print(len(O) - sum(map(bool, O)))
-        idx_best_available = policy(order, Z, C, V, O)
-        O[idx_best_available] += [idx_z_pick, idx_z_drop]
+        # Free carts have been already updated
+        for i in range(len(C)):
+            if not O[i]:
+                C_t_last_update[i] = t_curr
 
-        # now
-        C_t_last_update[idx_best_available] = t_curr
-
-        # path distance and delivery time
-        distance = path_length(C[idx_best_available], Z[idx_z_pick], Z[idx_z_drop])
-        delivery_time = distance / V[idx_best_available]
-
-        # add stats for this order
-        sum_waiting_time += (t_curr - t_arr) + delivery_time
-        sum_distance += distance
-        sum_consumption += P * delivery_time
-
-        # update state
+        # Update state
         first_time = True
         t_curr_updated = False
         while all(O) or first_time:
@@ -250,6 +238,19 @@ def fitness(individual: MetaPrimitiveTree | tuple[Callable[[DynamicOrder, np.arr
                             C_t_last_update[i] = t_curr - (elapsed_time - remaining_time)
                         else:
                             C_t_last_update[i] = t_curr
+
+        # Apply policy
+        idx_best_available = policy(order, Z, C, V, O)
+        O[idx_best_available] += [idx_z_pick, idx_z_drop]
+
+        # Path distance and delivery time
+        distance = path_length(C[idx_best_available], Z[idx_z_pick], Z[idx_z_drop])
+        delivery_time = distance / V[idx_best_available]
+
+        # Add stats for this order
+        sum_waiting_time += (t_curr - t_arr) + delivery_time
+        sum_distance += distance
+        sum_consumption += P * delivery_time
 
     fitness_values = []
     if OBJECTIVES['time']:
@@ -316,7 +317,7 @@ def main():
     logbook.header = mstats.fields
 
     print('-- Start of evolution --')
-    start_time = time.time()
+    start_time = time.perf_counter()
     pop, val_hof = evolution(
         weights=WEIGHTS,
         fitness_creator=creator.FitnessMin,
@@ -334,7 +335,7 @@ def main():
         max_non_imp=MAX_NON_IMP,
         verbose=True
     )
-    end_time = time.time()
+    end_time = time.perf_counter()
     print('-- End of evolution --')
     print('Evolution time:', str(datetime.timedelta(seconds=(end_time - start_time))))
 
