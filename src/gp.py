@@ -193,7 +193,6 @@ def fitness(individual: MetaPrimitiveTree | tuple[Callable[[DynamicOrder, np.arr
         t_curr = max(t_arr, t_curr)
 
         # Free carts have been already updated
-        n_free = 0
         for i in range(len(C)):
             if not O[i]:
                 C_t_last_update[i] = t_curr

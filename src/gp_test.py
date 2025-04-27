@@ -11,8 +11,8 @@ def main():
     toolbox = get_toolbox(pset)
     ind_to_eval = MetaPrimitiveTree.from_string(INDIVIDUAL, pset)
 
-    t, d, c = toolbox.evaluate_test(ind_to_eval)
-    #t, d, c = toolbox.evaluate_test((RR, 1))
+    t, d, c = toolbox.evaluate_train(ind_to_eval)
+    #t, d, c = toolbox.evaluate_train((RR, 1))
     
     print(f'Time: {t:.7g}')
     print(f'Distance: {d:.7g}')
