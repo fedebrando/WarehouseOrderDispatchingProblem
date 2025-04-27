@@ -1,13 +1,13 @@
 
-RUN_NAME = 'attempt003'
-SEED = 5839201746
+RUN_NAME = 'attempt011_b'
+SEED = 1049583726
 
 USE_PARETO = False
 OBJECTIVES = {
-    'time': 0,
-    'distance': 0,
+    'time': -10.0,
+    'distance': -1.0,
     'consumption': -0.01,
-    'size_penalty': -0.0001
+    'size_penalty': 0
 }
 
 VALIDATE_EVERY = 5

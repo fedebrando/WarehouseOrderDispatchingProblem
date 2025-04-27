@@ -29,7 +29,9 @@ class Warehouse:
     _AGV_COLOR_IDLE = (0, 255, 0)
     _AGV_COLOR_BUSY = (255, 0, 0)
 
-    def __init__(self, Z: list[list[float]], C: list[list[float]], V: list[float], P: float, th_short: float = 0, th_mid: float = 5, th_strong: float = 10):
+    def __init__(self, name: str, Z: list[list[float]], C: list[list[float]], V: list[float], P: float, th_short: float = 0, th_mid: float = 5, th_strong: float = 10):
+        self._name = name
+
         all_pos = Z + C
         self._W = max(x for [x, _] in all_pos) + min(x for [x, _] in all_pos)
         self._H = max(y for [_, y] in all_pos) + min(y for [_, y] in all_pos)
@@ -74,7 +76,7 @@ class Warehouse:
         '''
         pygame.init()
         self._screen = pygame.display.set_mode((self._W + self._WIDTH_TERMINAL, self._H))  
-        pygame.display.set_caption('Warehouse Simulator')
+        pygame.display.set_caption(self._name)
         self._font = pygame.font.SysFont('Courier', 18)
     
     def _delay_color(self, delay: float):
@@ -105,9 +107,9 @@ class Warehouse:
 
         terminal_data.append(('', self._TERMINAL_DEFAULT_COLOR))
 
-        terminal_data.append((f"{'Mean waiting time':<20}{self._stats.mean_waiting_time():.2f} s", self._TERMINAL_DEFAULT_COLOR))
-        terminal_data.append((f"{'Mean distance':<20}{self._stats.mean_distance():.2f} m", self._TERMINAL_DEFAULT_COLOR))
-        terminal_data.append((f"{'Mean consumption':<20}{self._stats.mean_consumption():.2f} J", self._TERMINAL_DEFAULT_COLOR))
+        terminal_data.append((f"{'Mean waiting time':<20}{self._stats.mean_waiting_time():.7g} s", self._TERMINAL_DEFAULT_COLOR))
+        terminal_data.append((f"{'Mean distance':<20}{self._stats.mean_distance():.7g} m", self._TERMINAL_DEFAULT_COLOR))
+        terminal_data.append((f"{'Mean consumption':<20}{self._stats.mean_consumption():.7g} J", self._TERMINAL_DEFAULT_COLOR))
         
         return terminal_data
 
@@ -212,7 +214,7 @@ class Warehouse:
 
             # Draw the AGV
             pygame.draw.circle(self._screen, color, (int(c[0]), int(c[1])), 10)
-            label = self._font.render(f'{idx}', True, self._AGV_TEXT_COLOR)
+            label = self._font.render(f'{idx + 1}', True, self._AGV_TEXT_COLOR)
             x_pos = int(c[0] - label.get_width() / 2)
             y_pos = int(c[1] - label.get_height() / 2)
             self._screen.blit(label, (x_pos, y_pos))
