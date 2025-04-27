@@ -2,7 +2,7 @@
 import time
 import numpy as np
 
-from classical_policies import d
+from utilities import d
 
 def d_np(p1: np.array, p2: np.array):
     '''
@@ -34,14 +34,14 @@ class Stats:
         '''
         Stores order arrival time
         '''
-        self._start_end[order_id] = [time.time(), None]
+        self._start_end[order_id] = [time.perf_counter(), None]
 
     def order_executed(self, order_id: int):
         '''
         Stores order executed time
         '''
-        self._start_end[order_id][1] = time.time()
-        self._sum_waiting_time += self._start_end[order_id][1] - self._start_end[order_id][0]
+        self._start_end[order_id][1] = time.perf_counter()
+        self._sum_waiting_time += self._start_end[order_id][1] - self._start_end[order_id][0] + self.delay_of(order_id)
         self._len_executed_orders += 1
 
     def mean_waiting_time(self) -> float:

@@ -32,9 +32,9 @@ class OrderManager:
         '''
         Order manager thread
         '''
-        t0 = time.time()
+        t0 = time.perf_counter()
         for order in self._orders:
-            time_diff = t0 + order.get_t_arr() - time.time()
+            time_diff = t0 + order.get_t_arr() - time.perf_counter()
             time.sleep(max(time_diff, 0))
             self._warehouse.assign_job(self._policy, order, time_diff)
 
