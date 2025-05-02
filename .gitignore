@@ -2,7 +2,6 @@
 __pycache__
 test.py
 .venv
-data
 runs
 plotting
 todo.txt
