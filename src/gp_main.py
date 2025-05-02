@@ -16,9 +16,9 @@ from utilities import path_length
 from reading_data import read_data
 from dynamic_order import DynamicOrder
 from initial_state import InitialState
-from evolution import evolution, pareto_or_global_evaluation
-from classical_policies import *
-from meta_primitive_tree import MetaPrimitiveTree
+from gp_evolution import evolution, pareto_or_global_evaluation
+from traditional_policies import *
+from gp_meta_primitive_tree import MetaPrimitiveTree
 
 WEIGHTS = []
 for w in OBJECTIVES.values():

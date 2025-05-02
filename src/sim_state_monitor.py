@@ -4,7 +4,7 @@ import numpy as np
 from typing import Callable
 
 from dynamic_order import DynamicOrder
-from stats import Stats
+from sim_stats import Stats
 
 class StateMonitor:
     '''

@@ -5,10 +5,10 @@ from math import inf
 import tensorflow as tf
 from typing import Callable
 
-from meta_primitive_tree import MetaPrimitiveTree
+from gp_meta_primitive_tree import MetaPrimitiveTree
 from utilities import weighted_sum
-from validation_hall_of_fame import ValidationHallOfFame
-from validation_pareto_front import ValidationParetoFront
+from gp_validation_hall_of_fame import ValidationHallOfFame
+from gp_validation_pareto_front import ValidationParetoFront
 
 def pareto_or_global_evaluation(use_pareto: bool, eval: tuple[float], weights: tuple[float]) -> tuple[float]:
     '''
